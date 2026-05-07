@@ -4,53 +4,196 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>C.Play — Children's Play Generator (offline)</title>
+<script>
+  // Run before stylesheets parse so the correct theme is applied immediately.
+  (function(){
+    try {
+      var t = localStorage.getItem('cplay.theme');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  })();
+</script>
 <style>
   :root {
-    --bg: #d8d4c7;
-    --paper: #f8f5ec;
-    --panel: #ddd8cb;
-    --ink: #1c1a16;
-    --muted: #807a70;
-    --accent: #2c2a26;
-    --accent-soft: #e2ddcd;
-    --accent2: #44423c;
-    --gold: #6f6353;
-    --line: #c6bfae;
-    --line-soft: #d6cfbd;
-    --good: #4a5042;
-    --warn: #6a4a38;
-    --shadow: 0 1px 0 rgba(0,0,0,.02), 0 6px 20px rgba(50,42,28,.08), 0 24px 48px rgba(50,42,28,.04);
-    --serif: "Iowan Old Style", "Source Serif Pro", Georgia, "Hoefler Text", serif;
+    /* LIGHT MODE — paper-white + true black + single red accent */
+    --bg: #ececec;
+    --paper: #ffffff;
+    --panel: #f3f3f3;
+    --ink: #0a0a0a;
+    --muted: #757575;
+    --accent: #d62828;
+    --accent-soft: #fde7e7;
+    --accent2: #0a0a0a;
+    --gold: #0a0a0a;
+    --line: #d8d8d8;
+    --line-soft: #ebebeb;
+    --good: #2f7d4f;
+    --warn: #d62828;
+    --shadow: 0 1px 0 rgba(0,0,0,.02), 0 6px 18px rgba(0,0,0,.06), 0 24px 48px rgba(0,0,0,.03);
     --display: "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
     --sans: "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
     --script: "Courier Prime", "Courier Final Draft", "Courier New", Courier, ui-monospace, monospace;
-    --c1:#4a2f1e; --c2:#233834; --c3:#3a2a3e; --c4:#3e3320;
-    --c5:#1f2a3a; --c6:#3e2730; --c7:#2c3a26; --c8:#2c2218;
-    --cN:#9a948a;
+    /* Character speaker colors: hero (c1) is the red accent; everyone else is ink. Narrator is muted. */
+    --c1: #d62828; --c2: #0a0a0a; --c3: #0a0a0a; --c4: #0a0a0a;
+    --c5: #0a0a0a; --c6: #0a0a0a; --c7: #0a0a0a; --c8: #0a0a0a;
+    --cN: #999999;
+  }
+  :root[data-theme="dark"] {
+    /* DARK MODE — near-black bg, off-white ink, brighter red */
+    --bg: #0a0a0a;
+    --paper: #181818;
+    --panel: #121212;
+    --ink: #f2f2f2;
+    --muted: #888888;
+    --accent: #ef4444;
+    --accent-soft: #2a0e0e;
+    --accent2: #f2f2f2;
+    --gold: #f2f2f2;
+    --line: #2a2a2a;
+    --line-soft: #1e1e1e;
+    --good: #4ad481;
+    --warn: #ef4444;
+    --shadow: 0 1px 0 rgba(0,0,0,.4), 0 6px 24px rgba(0,0,0,.5), 0 24px 60px rgba(0,0,0,.4);
+    --c1: #ef4444; --c2: #f2f2f2; --c3: #f2f2f2; --c4: #f2f2f2;
+    --c5: #f2f2f2; --c6: #f2f2f2; --c7: #f2f2f2; --c8: #f2f2f2;
+    --cN: #777777;
+  }
+  /* System-preference fallback when no manual theme set */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) {
+      --bg: #0a0a0a;
+      --paper: #181818;
+      --panel: #121212;
+      --ink: #f2f2f2;
+      --muted: #888888;
+      --accent: #ef4444;
+      --accent-soft: #2a0e0e;
+      --accent2: #f2f2f2;
+      --gold: #f2f2f2;
+      --line: #2a2a2a;
+      --line-soft: #1e1e1e;
+      --shadow: 0 1px 0 rgba(0,0,0,.4), 0 6px 24px rgba(0,0,0,.5), 0 24px 60px rgba(0,0,0,.4);
+      --c1: #ef4444; --c2: #f2f2f2; --c3: #f2f2f2; --c4: #f2f2f2;
+      --c5: #f2f2f2; --c6: #f2f2f2; --c7: #f2f2f2; --c8: #f2f2f2;
+      --cN: #777777;
+    }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); }
-  body { display: grid; grid-template-columns: 380px 1fr; min-height: 100vh; }
-  @media (max-width: 900px) { body { grid-template-columns: 1fr; } }
+  body { min-height: 100vh; }
+  /* Two-screen flow: setup (form) vs play (script) — only one visible */
+  .screen { display: none; }
+  body[data-view="setup"] .screen-setup { display: block; }
+  body[data-view="play"] .screen-play { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  body:not([data-view]) .screen-setup { display: block; } /* fallback to setup */
+  @media (max-width: 900px) {
+    body[data-view="play"] .screen-play { height: 100vh; min-height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  }
 
   body { font-family: var(--sans); }
-  aside.controls {
-    background: var(--panel); border-right: 1px solid var(--line);
-    padding: 22px 24px 22px; overflow: hidden; height: 100vh;
-    position: sticky; top: 0;
-    display: flex; flex-direction: column;
+
+  /* SETUP SCREEN — full-page form */
+  .screen-setup { background: var(--bg); padding: 32px 0 48px; }
+  .screen-setup .container { max-width: 780px; margin: 0 auto; padding: 0 32px; }
+  @media (max-width: 700px) {
+    .screen-setup { padding: 16px 0 32px; }
+    .screen-setup .container { padding: 0 14px; }
   }
-  aside .scroll {
-    flex: 0 1 auto; overflow-y: auto; min-height: 0;
-    margin: 0 -24px; padding: 0 24px;
+  .setup-head { margin-bottom: 16px; }
+  .setup-head .brand {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
   }
-  aside .filler { flex: 1 1 auto; }
+  .setup-head h1 { margin: 0 0 4px; font-family: var(--display); font-size: 22px; letter-spacing: 1px; text-transform: uppercase; }
+  .setup-head .tagline { color: var(--muted); font-size: 12px; letter-spacing: .5px; }
+  .setup-card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 22px 26px;
+  }
+  @media (max-width: 700px) { .setup-card { padding: 16px 18px; border-radius: 12px; } }
+
+  .setup-actions {
+    display: flex; gap: 14px; margin: 20px 0 22px;
+  }
+  .setup-actions button { flex: 1; }
+  @media (max-width: 600px) {
+    .setup-actions { flex-direction: column; gap: 10px; }
+    .setup-actions button { flex: 1 1 auto; width: 100%; }
+  }
+
+  /* PLAY SCREEN — script + nav */
+  .screen-play { background: var(--bg); }
+  .play-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .play-head #docTitle {
+    font-family: var(--display); font-size: 13px;
+    text-transform: uppercase; letter-spacing: 1px;
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .play-head-right { display: flex; align-items: center; gap: 6px; }
+  /* NEW = red back button */
+  .play-back {
+    background: var(--accent); color: #fff; border: 1px solid var(--accent);
+    padding: 10px 18px; border-radius: 10px; cursor: pointer;
+    font-family: var(--sans); font-size: 13px; font-weight: 700;
+    letter-spacing: 1.2px; text-transform: uppercase;
+    transition: background .12s;
+  }
+  .play-back:hover { background: var(--ink); border-color: var(--ink); }
+  .hamburger {
+    background: transparent; border: 1px solid var(--line); color: var(--ink);
+    width: 40px; height: 40px; padding: 0; border-radius: 10px;
+    cursor: pointer; font-size: 18px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--sans);
+  }
+  .hamburger:hover { border-color: var(--ink); }
+  .hamburger[aria-expanded="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  /* Hamburger menu drawer */
+  .menu {
+    position: absolute; top: 64px; right: 16px; z-index: 20;
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 12px; padding: 8px; min-width: 220px;
+    display: flex; flex-direction: column; gap: 4px;
+    box-shadow: var(--shadow);
+  }
+  .menu[hidden] { display: none; }
+  .menu .iconbtn {
+    text-align: left; border: 0; background: transparent;
+    padding: 12px 14px; font-size: 13px; border-radius: 8px;
+    letter-spacing: .8px;
+  }
+  .menu .iconbtn:hover { background: var(--accent-soft); border: 0; }
+  /* Mobile: hide status message in play-head — it crowds the title */
+  @media (max-width: 600px) {
+    .play-head #status { display: none; }
+    .play-head { padding: 8px 12px; }
+    .play-head #docTitle { font-size: 11px; letter-spacing: .8px; }
+    .play-back { padding: 6px 10px; font-size: 10px; }
+  }
   /* Hide scrollbar visually but keep functionality if content does overflow */
   aside .scroll::-webkit-scrollbar { width: 0; height: 0; }
   aside .scroll { scrollbar-width: none; }
   @media (max-width: 900px) { aside.controls { height: auto; position: static; overflow: visible; } aside .scroll { overflow: visible; } }
+  aside .brand {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 8px; margin-bottom: 14px;
+  }
   aside h1 { margin: 0 0 4px; font-family: var(--display); font-size: 20px; letter-spacing: 1px; text-transform: uppercase; }
-  aside .tagline { color: var(--muted); font-size: 11px; margin-bottom: 14px; letter-spacing: .5px; }
+  aside .brand .meta { flex: 1; min-width: 0; }
+  aside .tagline { color: var(--muted); font-size: 11px; letter-spacing: .5px; }
+  .theme-toggle {
+    background: transparent; border: 1px solid var(--line);
+    color: var(--ink); width: 40px; height: 40px; flex: 0 0 40px;
+    border-radius: 50%; cursor: pointer; font-size: 16px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--sans); padding: 0;
+    transition: background .12s, border-color .12s;
+  }
+  .theme-toggle:hover { border-color: var(--ink); background: var(--accent-soft); }
 
   /* Accordion sections */
   details.section {
@@ -64,70 +207,71 @@
   }
   details.section > summary::-webkit-details-marker { display: none; }
   details.section > summary h2 {
-    margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
+    margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px;
     color: var(--muted); font-weight: 700;
   }
   details.section > summary .summary-state {
-    color: var(--muted); font-size: 18px; font-family: var(--sans); font-weight: 400;
-    transition: transform .15s;
+    color: var(--muted); font-size: 22px; font-family: var(--sans); font-weight: 400;
+    transition: transform .15s; line-height: 1;
   }
   details.section[open] > summary .summary-state { transform: rotate(45deg); }
   details.section[open] > summary { padding-bottom: 6px; }
   details.section > .body { padding-bottom: 14px; }
   details.section[open] > summary h2 { color: var(--ink); }
-  label { display: block; font-size: 13px; margin: 16px 0 8px; letter-spacing: .3px; }
+  label { display: block; font-size: 14px; margin: 18px 0 10px; letter-spacing: .3px; }
   label:first-child, .section h2 + label { margin-top: 0; }
   label .hint { color: var(--muted); font-weight: 400; font-size: 12px; text-transform: none; letter-spacing: 0; }
   input[type=text], input[type=number], select, textarea {
-    width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 2px;
-    background: var(--paper); font-family: var(--sans); font-size: 14px; color: var(--ink);
+    width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--paper); font-family: var(--sans); font-size: 15px; color: var(--ink);
   }
   textarea { resize: vertical; min-height: 60px; }
   input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 10px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 12px; }
   .chip {
-    font-size: 13px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 2px;
+    font-size: 14px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 10px;
     background: var(--paper); cursor: pointer; user-select: none; font-family: var(--sans);
     color: var(--ink); letter-spacing: .4px; font-weight: 500;
     transition: border-color .12s, background .12s;
   }
   .chip:hover { border-color: var(--ink); }
-  .chip[aria-pressed="true"] { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+  .chip[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
   .list { display: flex; flex-direction: column; gap: 10px; }
   .list .item { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 10px; }
   .list .item.simple { grid-template-columns: 1fr auto; }
   .list .item button.del {
-    background: transparent; border: 1px solid var(--line); border-radius: 2px;
-    width: 40px; cursor: pointer; color: var(--muted); font-family: var(--sans); font-size: 16px;
+    background: transparent; border: 1px solid var(--line); border-radius: 10px;
+    width: 44px; cursor: pointer; color: var(--muted); font-family: var(--sans); font-size: 18px;
   }
   .list .item button.del:hover { color: var(--ink); border-color: var(--ink); }
   .add-btn {
-    background: transparent; border: 1px dashed var(--line); border-radius: 2px;
-    padding: 12px; font-size: 13px; cursor: pointer; color: var(--muted); width: 100%;
-    font-family: var(--sans); letter-spacing: .4px; margin-top: 6px;
+    background: transparent; border: 1px dashed var(--line); border-radius: 10px;
+    padding: 14px; font-size: 14px; cursor: pointer; color: var(--muted); width: 100%;
+    font-family: var(--sans); letter-spacing: .4px; margin-top: 8px;
   }
   .add-btn:hover { color: var(--ink); border-color: var(--ink); }
-  .lock-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .lock-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
   .lock {
-    font-size: 12px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 2px;
+    font-size: 13px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 10px;
     background: var(--paper); cursor: pointer; user-select: none; color: var(--muted);
     font-family: var(--sans); letter-spacing: .4px;
   }
   .lock[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--ink); color: var(--ink); }
 
   .actions {
-    margin: 16px 0 0; padding: 16px 0 0;
+    margin: 18px 0 0; padding: 18px 0 0;
     border-top: 1px solid var(--line);
-    display: flex; gap: 12px;
+    display: flex; gap: 14px;
   }
   button.primary, button.secondary {
-    flex: 1; padding: 16px 18px; border-radius: 2px; cursor: pointer; font-weight: 700;
-    border: 1px solid var(--accent); font-size: 13px; font-family: var(--sans);
+    flex: 1; padding: 18px 20px; border-radius: 12px; cursor: pointer; font-weight: 700;
+    border: 1px solid var(--accent); font-size: 14px; font-family: var(--sans);
     letter-spacing: 1.4px; text-transform: uppercase;
+    transition: background .12s, transform .12s;
   }
-  button.primary { background: var(--accent); color: var(--paper); }
-  button.primary:hover { background: var(--ink); }
+  button.primary { background: var(--accent); color: #fff; }
+  button.primary:hover { background: var(--ink); border-color: var(--ink); }
   button.secondary { background: var(--paper); color: var(--ink); }
   button.secondary:hover { background: var(--accent-soft); }
 
@@ -144,8 +288,8 @@
   .topbar #docTitle { font-size: 14px; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; letter-spacing: 1px; }
   .topbar .right { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
   .iconbtn {
-    background: var(--paper); border: 1px solid var(--line); border-radius: 2px;
-    padding: 5px 10px; font-size: 10px; cursor: pointer; color: var(--ink);
+    background: var(--paper); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 14px; font-size: 12px; cursor: pointer; color: var(--ink);
     font-family: var(--sans); letter-spacing: .6px; text-transform: uppercase;
     transition: border-color .15s, background .15s;
   }
@@ -182,26 +326,26 @@
 
   /* Page navigation bar */
   .page-nav {
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    padding: 6px 10px; background: var(--paper);
-    border: 1px solid var(--line); border-radius: 2px;
-    font-family: var(--sans); font-size: 10px; letter-spacing: .6px; text-transform: uppercase;
-    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 14px; background: var(--paper);
+    border: 1px solid var(--line); border-radius: 12px;
+    font-family: var(--sans); font-size: 12px; letter-spacing: .6px; text-transform: uppercase;
+    margin-bottom: 14px;
   }
   .page-nav .reh-spacer { flex: 1; }
   .page-nav select {
-    padding: 4px 8px; border: 1px solid var(--line); border-radius: 2px;
-    background: var(--paper); font-family: var(--sans); font-size: 10px;
+    padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--paper); font-family: var(--sans); font-size: 12px;
     text-transform: uppercase; letter-spacing: .6px; color: var(--ink); cursor: pointer;
-    max-width: 220px;
+    max-width: 240px;
   }
   .page-nav button {
-    padding: 4px 9px; border: 1px solid var(--line); border-radius: 2px;
-    background: var(--paper); font-family: var(--sans); font-size: 10px; cursor: pointer;
+    padding: 8px 14px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--paper); font-family: var(--sans); font-size: 12px; cursor: pointer;
     color: var(--ink); letter-spacing: .6px; text-transform: uppercase;
   }
   .page-nav button:hover { border-color: var(--ink); }
-  .page-nav button:disabled { opacity: .35; cursor: not-allowed; }
+  .page-nav button:disabled { opacity: .4; cursor: not-allowed; }
   .page-nav .counter { color: var(--muted); }
 
   /* Page paper — 8.5x11 ratio, sized to fit BOTH viewport dimensions */
@@ -216,8 +360,8 @@
     color: var(--ink);
     position: relative;
     display: none;
-    /* Take the smaller of: hard cap, full main width, or what aspect-ratio allows for the viewport height */
-    width: min(720px, 100%, calc((100vh - 160px) * 0.7727));
+    /* Largest 8.5x11 paper that fits both width (with some breathing room for flip arrows) and height */
+    width: min(880px, calc(100% - 100px), calc((100vh - 130px) * 0.7727));
     aspect-ratio: 8.5 / 11;
     margin: 0 auto;
     overflow: hidden;
@@ -226,6 +370,8 @@
     flex-grow: 0;
   }
   .page-paper.is-active { display: flex; flex-direction: column; }
+  /* Center page-paper vertically in available output space */
+  #output { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; flex: 1; min-height: 0; padding: 14px 12px; }
   @media (max-width: 560px) {
     .page-paper { padding: 24px 20px 32px; height: auto; aspect-ratio: auto; max-width: 100%; }
   }
@@ -265,7 +411,7 @@
   }
   .eyebrow {
     font-family: var(--sans); font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
-    color: var(--muted); font-weight: 700; margin: 0;
+    color: var(--accent); font-weight: 700; margin: 0;
   }
   .play-title {
     font-family: var(--display); font-size: 32px; line-height: 1.2; margin: 0 auto;
@@ -355,7 +501,6 @@
     color: var(--muted); display: block; margin-bottom: 2px;
     font-family: var(--sans); font-weight: 700;
   }
-  .act-rule { display: none; }
 
   .scene-block { margin-top: 12px; }
   .scene-h {
@@ -417,7 +562,7 @@
   }
 
   .editable { outline: none; border-radius: 4px; padding: 1px 4px; }
-  .editable:focus, .editable:hover { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+  .editable:focus, .editable:hover { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--line); }
 
   .library { margin-top: 28px; }
   .library h2 { font-family: var(--sans); font-size: 11px; text-transform: uppercase; letter-spacing: 1.6px; color: var(--muted); margin: 0 0 8px; }
@@ -494,23 +639,57 @@
     .actions { gap: 8px; }
   }
   @media (max-width: 560px) {
+    /* Mobile screen: drop aspect-ratio so page fills viewport. Print CSS still uses 8.5x11. */
     .page-paper {
-      padding: 22px 18px 30px; height: auto; aspect-ratio: auto;
-      width: 100%; max-width: 100%;
-      min-height: calc(100vh - 240px);
+      padding: 22px 18px 28px;
+      width: 100%;
+      max-width: 100%;
+      aspect-ratio: auto;
+      height: auto;
+      min-height: calc(100vh - 200px);
+      flex: 1 1 auto;
     }
-    /* Hide floating side arrows; the top page-nav has prev/next */
+    /* Script-fine type on mobile — readable, still feels like a printed booklet */
+    .page-paper .play-title { font-size: 22px; }
+    .page-paper .logline { font-size: 13px; }
+    .page-paper .meta-row { font-size: 10px; }
+    .page-paper .eyebrow { font-size: 10px; letter-spacing: 2px; }
+    .page-paper .act-h { font-size: 13px; }
+    .page-paper .act-h .num { font-size: 9px; }
+    .page-paper .scene-h { font-size: 9px; letter-spacing: 1.4px; }
+    .page-paper .scene-loc { font-size: 11px; }
+    .page-paper .scene-od { font-size: 11px; }
+    .page-paper .line { grid-template-columns: 80px 1fr; gap: 8px; }
+    .page-paper .line .speaker, .page-paper .line .speaker select { font-size: 10px; letter-spacing: .3px; }
+    .page-paper .line .text { font-size: 12px; line-height: 1.45; }
+    .page-paper .line .direction { font-size: 11px; }
+    .page-paper .section-h { font-size: 10px; letter-spacing: 2px; margin: 14px 0 8px; }
+    .page-paper .cast-card .info { font-size: 12px; }
+    .page-paper .cast-card .name { font-size: 11.5px; }
+    .page-paper .cast-card .desc { font-size: 11.5px; }
+    .page-paper .cast-card .lines-right { font-size: 10.5px; }
+    .page-paper .prop-chips { font-size: 12px; }
+    .page-paper .teacher-note { font-size: 12px; padding: 10px 12px; }
+    .page-paper .teacher-note .label { font-size: 9px; }
+    .page-paper .setting-block { font-size: 12px; }
+    .page-paper .end-mark { font-size: 10.5px; letter-spacing: 4px; }
+    .page-paper .page-num { font-size: 9px; bottom: 12px; right: 14px; }
+    .page-paper .page-running { font-size: 8.5px; top: 12px; left: 14px; letter-spacing: .8px; }
+    .page-paper .page-running.right { left: auto; right: 14px; top: 12px; }
+
+    #output { padding: 8px 8px 16px; flex: 1; }
     .flip { display: none !important; }
-    /* Cast as single column rows */
     .cast-grid { grid-template-columns: 1fr; }
-    /* Props in one column on phones */
     .prop-chips { columns: 1; }
+    .page-nav { font-size: 11px; padding: 8px 10px; gap: 6px; }
+    .page-nav .counter { font-size: 11px; }
   }
 
   /* ===== Print: show all pages ===== */
   @media print {
     body { display: block; background: #fff; }
-    aside.controls, .topbar, .library, .scene-h button, .rehearsal-bar, .page-nav { display: none !important; }
+    aside.controls, .topbar, .library, .scene-h button, .rehearsal-bar, .page-nav, .play-head, .menu, .flip, .screen-setup { display: none !important; }
+    body[data-view="play"] .screen-play { display: block !important; height: auto; overflow: visible; }
     main { padding: 0; max-width: none; }
     .doc { display: block; }
     .page-paper { display: block !important; box-shadow: none; border: 0; padding: 0.6in 0.8in; page-break-after: always; max-width: none; }
@@ -522,13 +701,22 @@
   }
 </style>
 </head>
-<body>
+<body data-view="setup">
 
-<aside class="controls">
-  <h1>C.Play</h1>
-  <div class="tagline">Offline children's play generator · K&ndash;5</div>
+<!-- ============= SETUP SCREEN ============= -->
+<div class="screen screen-setup">
+  <div class="container">
+    <header class="setup-head">
+      <div class="brand">
+        <div class="meta">
+          <h1>C.Play</h1>
+          <div class="tagline">Offline children's play generator · K&ndash;5</div>
+        </div>
+        <button class="theme-toggle" id="themeToggleSetup" aria-label="Toggle light / dark theme" title="Toggle light / dark theme">☾</button>
+      </div>
+    </header>
 
-  <div class="scroll">
+    <div class="setup-card setup-form">
     <details class="section" open>
       <summary><h2>Audience &amp; Length</h2><span class="summary-state">+</span></summary>
       <div class="body">
@@ -543,19 +731,8 @@
           <button class="chip" data-val="medium">Medium</button>
           <button class="chip" data-val="long">Long</button>
         </div>
-        <div class="row">
-          <div>
-            <label>Cast size</label>
-            <input type="number" id="castSize" min="2" max="20" value="5" />
-          </div>
-          <div>
-            <label>Lines balance</label>
-            <select id="balance">
-              <option value="even">Spread evenly</option>
-              <option value="lead">Leads + supporting</option>
-            </select>
-          </div>
-        </div>
+        <label>Cast size</label>
+        <input type="number" id="castSize" min="2" max="20" value="5" />
       </div>
     </details>
 
@@ -666,7 +843,6 @@
           <button class="lock" data-lock="characters">Characters</button>
           <button class="lock" data-lock="props">Props</button>
           <button class="lock" data-lock="setting">Setting</button>
-          <button class="lock" data-lock="lesson">Lesson</button>
         </div>
         <label style="margin-top:10px">Seed <span class="hint">— same seed = same play</span></label>
         <div class="row">
@@ -677,47 +853,42 @@
     </details>
   </div>
 
-  <div class="actions">
-    <button class="secondary" id="surpriseMe">Surprise me</button>
-    <button class="primary" id="generate">Generate play</button>
-  </div>
-  <div class="filler"></div>
-</aside>
+    </div><!-- /.setup-card -->
 
-<main>
-  <div class="topbar">
-    <div class="left">
-      <strong id="docTitle" style="font-family: var(--display); font-size: 20px;">No play yet</strong>
+    <div class="setup-actions">
+      <button class="secondary" id="surpriseMe">Surprise me</button>
+      <button class="primary" id="generate">Generate play</button>
+    </div>
+
+    <div class="library" id="library"></div>
+  </div><!-- /.container -->
+</div><!-- /.screen-setup -->
+
+<!-- ============= PLAY SCREEN ============= -->
+<div class="screen screen-play">
+  <header class="play-head">
+    <button class="play-back" id="newPlay" aria-label="Start over">← New</button>
+    <strong id="docTitle">No play yet</strong>
+    <div class="play-head-right">
       <span id="status"></span>
+      <button class="theme-toggle" id="themeTogglePlay" aria-label="Toggle light / dark theme" title="Toggle light / dark theme">☾</button>
+      <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">☰</button>
     </div>
-    <div class="right">
-      <button class="iconbtn" id="saveLib">★ Save</button>
-      <button class="iconbtn" id="copyTxt">Copy text</button>
-      <button class="iconbtn" id="downloadTxt">Download .txt</button>
-      <button class="iconbtn" id="pdfBtn">📄 PDF</button>
-      <button class="iconbtn" id="printBtn">🖨 Print</button>
-      <button class="iconbtn" id="newPlay">New</button>
-    </div>
+  </header>
+
+  <div class="menu" id="menu" hidden>
+    <button class="iconbtn" id="saveLib">★ Save</button>
+    <button class="iconbtn" id="copyTxt">Copy text</button>
+    <button class="iconbtn" id="downloadTxt">Download .txt</button>
+    <button class="iconbtn" id="pdfBtn">📄 PDF</button>
+    <button class="iconbtn" id="printBtn">🖨 Print</button>
   </div>
 
   <button class="flip left" id="flipLeft" aria-label="Previous page">‹</button>
   <button class="flip right" id="flipRight" aria-label="Next page">›</button>
 
-  <div id="output" style="flex:1; min-height:0; display:flex; flex-direction:column;">
-    <div class="empty">
-      <svg class="curtain" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M8 8h48v6H8z" fill="currentColor"/>
-        <path d="M10 14c4 12 4 28 0 44h12c-2-14-2-28 0-44H10zm32 0c-2 16-2 30 0 44h12c-4-16-4-32 0-44H42z" fill="currentColor" opacity=".85"/>
-        <path d="M22 14c2 14 2 28 0 44h20c-2-16-2-30 0-44H22z" fill="currentColor" opacity=".55"/>
-      </svg>
-      <h2>Pick your pieces, press Generate.</h2>
-      <p>You'll get a full playbill — cover, cast cards, props, and a polished script — all editable.
-        Rename a character once, every line updates.</p>
-    </div>
-  </div>
-
-  <div class="library" id="library"></div>
-</main>
+  <div id="output"></div>
+</div><!-- /.screen-play -->
 
 <script>
 /* ============================================================
@@ -727,7 +898,6 @@ const state = {
   gradeBand: "3-5",
   length: "short",
   castSize: 5,
-  balance: "even",
   lesson: "kindness",
   tone: "silly",
   conflict: "vs-self",
@@ -738,7 +908,7 @@ const state = {
   directions: "standard",
   songs: false,
   random: "none",
-  locks: { characters: false, props: false, setting: false, lesson: false },
+  locks: { characters: false, props: false, setting: false },
   seed: "",
   play: null,
 };
@@ -932,27 +1102,27 @@ const GLOBAL_TITLES = [
   "{titleAdj}, {titleAdj}, {titleAdj}",
 ];
 
-// Scene-opening direction banks — varies per scene for richer staging
+// Scene-opening direction banks — settingShort/settingFeature1 already start with "the X" so don't prepend "the"
 const SCENE_OPENINGS = {
   bright: [
-    "Lights up. Morning sun spills across the {settingShort}.",
-    "Lights up. The {settingFeature1} is the brightest spot in the {settingShort}.",
-    "Lights up bright. The {settingShort} is alive with small motions.",
+    "Lights up. Morning sun spills across {settingShort}.",
+    "Lights up. {settingFeature1} is the brightest spot in {settingShort}.",
+    "Lights up bright. {settingShort} is alive with small motions.",
   ],
   later: [
-    "Lights shift to a softer, later-day glow over the {settingShort}.",
-    "Time has passed. Long shadows stretch across the {settingFeature1}.",
-    "Afternoon light. The {settingShort} has settled into its quieter rhythm.",
+    "Lights shift to a softer, later-day glow over {settingShort}.",
+    "Time has passed. Long shadows stretch across {settingFeature1}.",
+    "Afternoon light. {settingShort} has settled into its quieter rhythm.",
   ],
   tense: [
-    "Lights tighten on the {settingFeature1}. Something is about to happen.",
-    "Sound: a single note, held. Lights cool over the {settingShort}.",
-    "The {settingShort} feels different now. Watchful.",
+    "Lights tighten on {settingFeature1}. Something is about to happen.",
+    "Sound: a single note, held. Lights cool over {settingShort}.",
+    "{settingShort} feels different now. Watchful.",
   ],
   warm: [
-    "Lights ease back to warm. The {settingShort} feels like itself again.",
-    "A soft bell, somewhere. Light spreads gently across the {settingFeature1}.",
-    "Warm light returns to the {settingShort}, a little brighter than before.",
+    "Lights ease back to warm. {settingShort} feels like itself again.",
+    "A soft bell, somewhere. Light spreads gently across {settingFeature1}.",
+    "Warm light returns to {settingShort}, a little brighter than before.",
   ],
 };
 
@@ -1598,19 +1768,25 @@ function resolveSpeaker(code, ctx) {
   if (code === "N" || code === "NARRATOR") return "NARRATOR";
   if (code === "ALL") return "ALL";
   if (ctx.chars[code]) return ctx.chars[code].name;
-  // helper might not exist for tiny casts -> fall back to friend
-  if (code === "helper" && ctx.chars.friend) return ctx.chars.friend.name;
-  if (code === "mentor" && ctx.chars.friend) return ctx.chars.friend.name;
-  if (code === "newcomer" && ctx.chars.foil) return ctx.chars.foil.name;
-  return ctx.chars.hero ? ctx.chars.hero.name : "?";
+  // Smart fallback chains; never map back to hero (avoids hero-to-hero dialogue)
+  const chains = {
+    helper:   ['foil','friend'],
+    mentor:   ['friend','foil'],
+    newcomer: ['foil','friend'],
+    friend:   ['foil','helper','mentor'],
+    foil:     ['friend','helper','mentor'],
+  };
+  const chain = chains[code] || [];
+  for (const alt of chain) if (ctx.chars[alt]) return ctx.chars[alt].name;
+  return null; // signal: skip this line
 }
 
 function expandBeat(beat, ctx, opts = {}) {
   const out = [];
   for (const ln of beat) {
     const speaker = resolveSpeaker(ln.s, ctx);
+    if (!speaker) continue; // role doesn't exist in this cast — skip
     if (speaker === "NARRATOR" && ctx.state.narrator === "off") continue;
-    if (speaker === "?") continue;
     const text = fill(ln.t, ctx).trim();
     const direction = ln.d ? fill(ln.d, ctx) : undefined;
     out.push({ speaker, text, direction });
@@ -1900,6 +2076,7 @@ function buildPlay(state) {
     characters: charactersOut,
     props: props.list,
     acts,
+    shapeId: ctx.shape.id, // preserved so regenerateScene can reuse it
   };
 }
 
@@ -1932,7 +2109,6 @@ function wireChips() {
 function wireForm() {
   const $ = id => document.getElementById(id);
   $('castSize').addEventListener('input', e => state.castSize = +e.target.value || 5);
-  $('balance').addEventListener('change', e => state.balance = e.target.value);
   $('lesson').addEventListener('change', e => state.lesson = e.target.value);
   $('setting').addEventListener('input', e => state.setting = e.target.value);
   $('narrator').addEventListener('change', e => state.narrator = e.target.value);
@@ -1950,16 +2126,38 @@ function wireForm() {
   $('generate').addEventListener('click', generate);
   $('surpriseMe').addEventListener('click', surpriseMe);
   $('newPlay').addEventListener('click', newPlay);
-  $('printBtn').addEventListener('click', () => window.print());
+  $('printBtn').addEventListener('click', () => {
+    if (!state.play) { window.print(); return; }
+    const orig = document.title;
+    document.title = (state.play.title || 'play').replace(/[^a-z0-9]+/gi, '_') + '_play';
+    setTimeout(() => { window.print(); document.title = orig; }, 50);
+  });
   $('pdfBtn').addEventListener('click', () => {
     if (!state.play) return;
-    setStatus('Use "Save as PDF" in the dialog →', 'success');
-    setTimeout(() => window.print(), 50);
+    // Browsers' print dialog suggests a filename based on document.title — set it so the PDF
+    // saves with the play title, not "C.Play — Children's Play Generator (offline).pdf".
+    const orig = document.title;
+    document.title = (state.play.title || 'play').replace(/[^a-z0-9]+/gi, '_') + '_play';
+    setStatus('Choose "Save as PDF" in the dialog →', 'success');
+    setTimeout(() => { window.print(); document.title = orig; }, 50);
   });
   $('copyTxt').addEventListener('click', copyText);
   $('downloadTxt').addEventListener('click', downloadText);
-  $('saveLib').addEventListener('click', saveToLibrary);
+  $('saveLib').addEventListener('click', () => { saveToLibrary(); closeMenu(); });
+  $('copyTxt').addEventListener('click', () => closeMenu());
+  $('downloadTxt').addEventListener('click', () => closeMenu());
+  $('printBtn').addEventListener('click', () => closeMenu());
+  $('pdfBtn').addEventListener('click', () => closeMenu());
 
+  $('hamburger').addEventListener('click', toggleMenu);
+  // Close menu when clicking outside
+  document.addEventListener('click', (e) => {
+    const m = document.getElementById('menu');
+    const h = document.getElementById('hamburger');
+    if (!m || m.hidden) return;
+    if (m.contains(e.target) || h.contains(e.target)) return;
+    closeMenu();
+  });
 }
 
 function renderCharacterList() {
@@ -2011,12 +2209,12 @@ function generate() {
       if (state.locks.props) state.props = state.play.props.slice();
       if (state.locks.setting) state.setting = state.play.setting;
     }
-    // Always reroll: clear seed to force a fresh one (use the field only via dedicated jump-to-seed flow if needed)
     state.seed = String(Math.floor(Math.random() * 1e9));
-    document.getElementById('seed').value = state.seed;
+    const seedEl = document.getElementById('seed'); if (seedEl) seedEl.value = state.seed;
     state.play = buildPlay(state);
     renderPlay();
     document.body.classList.add('has-play');
+    setView('play');
     setStatus('Done.', 'success');
   } catch (e) {
     console.error(e);
@@ -2024,23 +2222,44 @@ function generate() {
   }
 }
 
+function setView(v) {
+  document.body.dataset.view = v;
+  closeMenu();
+  if (v === 'play') {
+    // Update theme toggle icons (the play-screen toggle is a different element)
+    updateThemeIcon();
+  }
+}
+function closeMenu() {
+  const m = document.getElementById('menu');
+  const h = document.getElementById('hamburger');
+  if (!m || !h) return;
+  m.hidden = true;
+  h.setAttribute('aria-expanded', 'false');
+}
+function toggleMenu() {
+  const m = document.getElementById('menu');
+  const h = document.getElementById('hamburger');
+  const open = m.hidden;
+  m.hidden = !open;
+  h.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
 function regenerateScene(actIdx, sceneIdx) {
-  // Re-run engine with same state, replace just that scene's lines
+  // Re-run engine for ONE scene only. Keeps cast/setting/props/shape; uses a
+  // local rng so global state.seed (and the original play seed) stays untouched.
   try {
     setStatus(`Rewriting Act ${actIdx + 1}, Scene ${sceneIdx + 1}…`);
-    // Keep locks effectively on — same chars/props/setting
     const keepChars = state.play.characters;
     const keepProps = state.play.props;
     const keepSetting = state.play.setting;
-    // Bump seed for variation
-    state.seed = String(Math.floor(Math.random() * 1e9));
-    document.getElementById('seed').value = state.seed;
-    rng = makeRng(state.seed);
+    // Local rng — does not mutate global rng or state.seed
+    const localSeed = String(Math.floor(Math.random() * 1e9));
+    const savedRng = rng;
+    rng = makeRng(localSeed);
 
-    // Build a fresh ctx using the existing chars/props/setting
     const settingKey = matchSettingKey(keepSetting) || "enchanted forest";
     const setting = SETTINGS[settingKey];
-    // Recreate chars in the role mapping order they currently are
     const roleOrder = ["hero","foil","friend","mentor","helper","newcomer"];
     const chars = {};
     keepChars.slice(0, roleOrder.length).forEach((c, i) => {
@@ -2049,10 +2268,14 @@ function regenerateScene(actIdx, sceneIdx) {
     const props = {};
     keepProps.forEach((p, i) => props["prop" + (i + 1)] = p);
 
-    const ctx = { state, chars, setting, props, shape: pickShape(state) };
+    // Reuse the SAME shape as the original play (preserves continuity)
+    const shape = (state.play.shapeId && SHAPES.find(s => s.id === state.play.shapeId)) || pickShape(state);
+
+    const ctx = { state, chars, setting, props, shape };
     const fresh = buildArc(ctx);
     const acts = chunkIntoActs(fresh, state.length);
     const newScene = acts[actIdx]?.scenes[sceneIdx];
+    rng = savedRng; // restore global rng
     if (!newScene) { setStatus('Could not rewrite that scene.', 'error'); return; }
     state.play.acts[actIdx].scenes[sceneIdx].lines = newScene.lines;
     renderPlay();
@@ -2530,6 +2753,19 @@ if (!window._pageKeyBound) {
   });
 }
 
+// Refresh per-character "N lines" labels on the front-matter page without re-paginating
+function updateCastLineCounts() {
+  if (!state.play) return;
+  const counts = lineCountByCharacter();
+  state.play.characters.forEach((c, i) => {
+    const card = document.querySelector(`.cast-card .info [data-bind-char="${i}"]`);
+    if (!card) return;
+    const lc = counts[c.name] || 0;
+    const right = card.closest('.cast-card')?.querySelector('.lines-right');
+    if (right) right.textContent = `${lc} line${lc === 1 ? '' : 's'}`;
+  });
+}
+
 function applyRehearsal() {
   const sel = document.getElementById('rehearsalChar');
   const target = sel ? sel.value : '';
@@ -2619,8 +2855,21 @@ function attachEditHandlers() {
   out.querySelectorAll('[data-bind-speaker]').forEach(el => {
     el.addEventListener('change', () => {
       const [ai, si, li] = el.dataset.bindSpeaker.split('-').map(Number);
-      state.play.acts[ai].scenes[si].lines[li].speaker = el.value;
-      renderPlay();
+      const newSpeaker = el.value;
+      state.play.acts[ai].scenes[si].lines[li].speaker = newSpeaker;
+      // In-place DOM update: avoid full re-render
+      const lineEl = el.closest('.line');
+      if (lineEl) {
+        const upper = newSpeaker.toUpperCase();
+        lineEl.dataset.speaker = newSpeaker;
+        lineEl.classList.toggle('narrator', upper === 'NARRATOR');
+        lineEl.classList.toggle('all', upper === 'ALL');
+        const color = colorForSpeaker(newSpeaker, state.play);
+        if (color) lineEl.style.setProperty('--ch', color);
+        else lineEl.style.removeProperty('--ch');
+      }
+      // Refresh cast line counts in place
+      updateCastLineCounts();
     });
   });
 
@@ -2637,21 +2886,69 @@ function attachEditHandlers() {
    ============================================================ */
 function playToText(p = state.play) {
   if (!p) return '';
-  let t = `${p.title}\n${'='.repeat(p.title.length)}\n\n`;
-  t += `${p.logline}\n\nLesson: ${p.lessonTakeaway}\n\nSetting: ${p.setting}\n\n`;
-  t += `Cast:\n${p.characters.map(c => `  ${c.name} — ${c.description}`).join('\n')}\n\n`;
-  t += `Props:\n${p.props.map(x => '  - '+x).join('\n')}\n\n`;
+  const wrap = (txt, indent = 0) => {
+    const ind = ' '.repeat(indent);
+    const max = 76 - indent;
+    const words = txt.split(/\s+/);
+    const lines = []; let cur = '';
+    for (const w of words) {
+      if ((cur + ' ' + w).trim().length > max) { lines.push(ind + cur.trim()); cur = w; }
+      else cur = (cur + ' ' + w).trim();
+    }
+    if (cur) lines.push(ind + cur.trim());
+    return lines.join('\n');
+  };
+  const center = txt => {
+    const pad = Math.max(0, Math.floor((76 - txt.length) / 2));
+    return ' '.repeat(pad) + txt;
+  };
+
+  let t = '';
+  // ===== Cover =====
+  t += '\n\n' + center(p.title.toUpperCase()) + '\n';
+  t += center('=' .repeat(Math.min(p.title.length, 60))) + '\n\n';
+  t += wrap(p.logline) + '\n\n';
+  t += center(`~${p.estimatedRunTimeMin || '?'} min  ·  ${p.acts.length} act${p.acts.length>1?'s':''}  ·  ${p.characters.length} roles`) + '\n\n';
+  t += '\n' + '-'.repeat(76) + '\n';
+
+  // ===== Teacher's note =====
+  t += '\nTEACHER\'S NOTE — LESSON\n';
+  t += wrap(p.lessonTakeaway, 4) + '\n\n';
+
+  // ===== Cast =====
+  t += 'CAST OF CHARACTERS\n';
+  p.characters.forEach(c => {
+    t += `    ${c.name.padEnd(14)}  ${c.description}\n`;
+  });
+  t += '\n';
+
+  // ===== Setting =====
+  t += 'SETTING\n';
+  t += wrap(p.setting, 4) + '\n\n';
+
+  // ===== Props =====
+  t += 'PROPS\n';
+  p.props.forEach(x => { t += `    · ${x}\n`; });
+  t += '\n' + '-'.repeat(76) + '\n';
+
+  // ===== Acts & scenes =====
   p.acts.forEach(a => {
-    t += `\n\nACT ${a.number}${a.title ? ' — ' + a.title : ''}\n${'-'.repeat(40)}\n`;
+    t += '\n\n' + center(`ACT ${ordinal(a.number).toUpperCase()}${a.title ? ' — ' + a.title.toUpperCase() : ''}`) + '\n\n';
     a.scenes.forEach(s => {
-      t += `\nScene ${s.number} — ${s.location}\n`;
-      if (s.openingDirection) t += `(${s.openingDirection})\n`;
-      s.lines.forEach(l => {
-        t += `\n${l.speaker.toUpperCase()}${l.direction ? ' (' + l.direction + ')' : ''}: ${l.text}`;
-      });
+      t += `\nSCENE ${s.number}\n`;
+      t += wrap(s.location.toUpperCase(), 0) + '\n';
+      if (s.openingDirection) t += '\n' + wrap(`(${s.openingDirection})`, 4) + '\n';
       t += '\n';
+      s.lines.forEach(l => {
+        const speaker = l.speaker.toUpperCase();
+        // Speaker on its own line, dialogue indented underneath (closer to standard playscript layout)
+        t += '              ' + speaker + (l.direction ? ' (' + l.direction + ')' : '') + '\n';
+        t += wrap(l.text, 4) + '\n\n';
+      });
     });
   });
+
+  t += '\n' + center('— END —') + '\n\n';
   return t;
 }
 
@@ -2695,7 +2992,13 @@ function renderLibrary() {
   root.querySelectorAll('[data-load]').forEach(b => b.addEventListener('click', () => {
     const lib = loadLibrary();
     const found = lib.find(x => x.id == b.dataset.load);
-    if (found) { state.play = found.play; renderPlay(); window.scrollTo({top:0,behavior:'smooth'}); }
+    if (found) {
+      state.play = found.play;
+      renderPlay();
+      document.body.classList.add('has-play');
+      setView('play');
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
   }));
   root.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
     saveLibrary(loadLibrary().filter(x => x.id != b.dataset.del));
@@ -2737,12 +3040,46 @@ function newPlay() {
   state.play = null;
   document.body.classList.remove('has-play');
   document.getElementById('docTitle').textContent = 'No play yet';
-  document.getElementById('output').innerHTML = `<div class="empty"><h2>Pick your pieces, press Generate.</h2></div>`;
+  document.getElementById('output').innerHTML = '';
+  setView('setup');
+}
+
+/* ============================================================
+   THEME
+   ============================================================ */
+function currentTheme() {
+  const explicit = document.documentElement.dataset.theme;
+  if (explicit) return explicit;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function updateThemeIcon() {
+  ['themeToggleSetup', 'themeTogglePlay'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.textContent = currentTheme() === 'dark' ? '☼' : '☾';
+  });
+}
+function toggleTheme() {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('cplay.theme', next);
+  updateThemeIcon();
+}
+function initTheme() {
+  const saved = localStorage.getItem('cplay.theme');
+  if (saved === 'light' || saved === 'dark') {
+    document.documentElement.dataset.theme = saved;
+  }
+  updateThemeIcon();
+  ['themeToggleSetup', 'themeTogglePlay'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener('click', toggleTheme);
+  });
 }
 
 /* ============================================================
    INIT
    ============================================================ */
+initTheme();
 wireChips();
 wireForm();
 renderCharacterList();
