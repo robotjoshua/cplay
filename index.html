@@ -79,15 +79,60 @@
     }
   }
   * { box-sizing: border-box; }
+  /* Hide scrollbars everywhere — scrolling stays functional, the bar disappears */
+  html, body, * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+  ::-webkit-scrollbar, ::-webkit-scrollbar-track, ::-webkit-scrollbar-thumb,
+  ::-webkit-scrollbar-button, ::-webkit-scrollbar-corner {
+    width: 0 !important; height: 0 !important; display: none !important;
+    background: transparent !important;
+  }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); }
   body { min-height: 100vh; }
-  /* Two-screen flow: setup (form) vs play (script) — only one visible */
+  /* Mobile (default): two-screen flow — only one visible at a time */
   .screen { display: none; }
   body[data-view="setup"] .screen-setup { display: block; }
   body[data-view="play"] .screen-play { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-  body:not([data-view]) .screen-setup { display: block; } /* fallback to setup */
+  body:not([data-view]) .screen-setup { display: block; }
   @media (max-width: 900px) {
     body[data-view="play"] .screen-play { height: 100vh; min-height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  }
+  /* DESKTOP: side-by-side sidebar + main script — both always visible */
+  @media (min-width: 900px) {
+    body {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      height: 100vh; overflow: hidden;
+    }
+    .screen-setup { display: block !important; height: 100vh; overflow-y: auto; padding: 18px 0 24px; }
+    .screen-setup::-webkit-scrollbar, .screen-setup::-webkit-scrollbar-track, .screen-setup::-webkit-scrollbar-thumb { display: none !important; width: 0 !important; height: 0 !important; }
+    .screen-setup .container { max-width: none; padding: 0 22px; }
+    .screen-play { display: flex !important; flex-direction: column; height: 100vh; overflow: hidden; }
+    /* Sidebar holds NEW + Generate. Hide play-screen NEW button + hamburger; show menu inline. */
+    .play-back { display: none !important; }
+    .hamburger { display: none !important; }
+    .menu, .menu[hidden] {
+      display: flex !important; flex-direction: row;
+      position: static; padding: 0; min-width: 0; gap: 4px;
+      box-shadow: none; border: 0; background: transparent;
+    }
+    .menu .iconbtn { font-size: 11px; padding: 8px 12px; }
+    .play-head { padding: 12px 20px; }
+    .play-head #docTitle { font-size: 14px; }
+    /* Empty state for play column when no play is generated */
+    body:not(.has-play) .screen-play #output::before {
+      content: 'Pick your pieces, press Generate.';
+      display: flex; align-items: center; justify-content: center;
+      flex: 1; color: var(--muted); font-family: var(--display);
+      font-size: 14px; letter-spacing: 3px; text-transform: uppercase;
+      width: 100%;
+    }
+    body:not(.has-play) .play-head #docTitle { color: var(--muted); }
+    body:not(.has-play) .play-head .menu, body:not(.has-play) .play-head-right .theme-toggle { opacity: .35; pointer-events: none; }
+    /* Keep page paper centered on desktop with comfortable side margins */
+    .page-paper { width: min(820px, calc(100% - 80px), calc((100vh - 130px) * 0.7727)); }
+    /* Desktop sidebar tweaks: constrain inputs that don't need full width */
+    #castSize { width: 110px; }
+    #seed { max-width: 220px; }
   }
 
   body { font-family: var(--sans); }
@@ -869,20 +914,19 @@
   <header class="play-head">
     <button class="play-back" id="newPlay" aria-label="Start over">← New</button>
     <strong id="docTitle">No play yet</strong>
+    <div class="menu" id="menu" hidden>
+      <button class="iconbtn" id="saveLib">★ Save</button>
+      <button class="iconbtn" id="copyTxt">Copy text</button>
+      <button class="iconbtn" id="downloadTxt">Download .txt</button>
+      <button class="iconbtn" id="pdfBtn">📄 PDF</button>
+      <button class="iconbtn" id="printBtn">🖨 Print</button>
+    </div>
     <div class="play-head-right">
       <span id="status"></span>
       <button class="theme-toggle" id="themeTogglePlay" aria-label="Toggle light / dark theme" title="Toggle light / dark theme">☾</button>
       <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">☰</button>
     </div>
   </header>
-
-  <div class="menu" id="menu" hidden>
-    <button class="iconbtn" id="saveLib">★ Save</button>
-    <button class="iconbtn" id="copyTxt">Copy text</button>
-    <button class="iconbtn" id="downloadTxt">Download .txt</button>
-    <button class="iconbtn" id="pdfBtn">📄 PDF</button>
-    <button class="iconbtn" id="printBtn">🖨 Print</button>
-  </div>
 
   <button class="flip left" id="flipLeft" aria-label="Previous page">‹</button>
   <button class="flip right" id="flipRight" aria-label="Next page">›</button>
