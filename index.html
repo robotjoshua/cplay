@@ -91,7 +91,8 @@
   /* Mobile (default): two-screen flow — only one visible at a time */
   .screen { display: none; }
   body[data-view="setup"] .screen-setup { display: block; }
-  body[data-view="play"] .screen-play { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  body[data-view="play"] .screen-play { display: flex; flex-direction: column; height: 100vh; overflow: hidden; position: relative; }
+  .screen-play { position: relative; }
   body:not([data-view]) .screen-setup { display: block; }
   @media (max-width: 900px) {
     body[data-view="play"] .screen-play { height: 100vh; min-height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
@@ -1097,7 +1098,7 @@ const V = {
     "While they were busy worrying,","With the quietest little click,","Because of course,"
   ],
   exclaim: ["Oh!","Wow!","Yikes!","Whoa!","Hey!","Goodness!","Gosh!","Look out!","No way!","Hold on!","Heavens!","Oh my!","Aha!","Egads!","Holy moly!","Sweet!","Yipes!","Crikey!"],
-  pause: ["...","(beat)","(quiet for a moment)","(slowly)","(thinking)","(holding still)","(looking at the floor)","(deep breath)","(eyes wide)","(silent)","(swallowing hard)","(searching for words)"],
+  pause: ["...","beat","quiet for a moment","slowly","thinking","holding still","looking at the floor","deep breath","eyes wide","silent","swallowing hard","searching for words"],
   worry: ["worried","frowning","biting their lip","fidgeting","glancing around","pacing a little","wringing their hands","scrunching their nose","nervous","tugging at their sleeve","staring at their feet","barely breathing","tapping a foot","jaw tight"],
   warmReact: ["smiling","beaming","with a soft laugh","grinning","with bright eyes","glowing","with a little hop","eyes twinkling","laughing softly","with a wide smile","light in their face","crinkling their nose","with a happy sigh"],
   smallVoice: ["quietly","in a small voice","almost whispering","barely speaking","in a soft hush","under their breath","carefully","gently","just above a whisper","in a hesitant voice","in a half-voice"],
@@ -1864,10 +1865,20 @@ function fill(template, ctx) {
       const toneV = TONES[ctx.state.tone] || {};
       const pool = toneV[key] || V[key];
       if (pool && Array.isArray(pool)) return pick(pool);
-      return m; // leave unresolved literal in place; loop will exit
+      return m;
     });
     if (out === prev) break;
   }
+  // Post-process cleanup — catches doubled articles where templates accidentally
+  // prefix "the" before a token that already starts with "the"
+  out = out
+    .replace(/\b(the)\s+the\b/gi, '$1')
+    .replace(/\b(a|an)\s+the\b/gi, 'the')
+    .replace(/\b(The)\s+The\b/g, '$1')
+    .replace(/\(\s*\(/g, '(')   // collapse "((" into "("
+    .replace(/\)\s*\)/g, ')')   // collapse "))" into ")"
+    .replace(/\s+,/g, ',')
+    .replace(/\s+\./g, '.');
   return out;
 }
 
@@ -2024,13 +2035,13 @@ function applyTwist(lines, ctx) {
   if (ctx.state.random === "none") return lines;
   if (ctx.state.random === "spicy") {
     const t = pick(TWISTS);
-    const direction = fill(t, ctx);
-    // attach as opening direction marker on first line of climax (caller can use)
-    return [{ speaker: "NARRATOR", text: "(twist) " + direction, direction: undefined }, ...lines];
+    // TWISTS already start with "(label) ..." — strip the parenthetical label and
+    // use the body as a clean narrator beat
+    const cleaned = fill(t, ctx).replace(/^\s*\([^)]+\)\s*/, '');
+    return [{ speaker: "NARRATOR", text: cleaned, direction: undefined }, ...lines];
   }
   if (ctx.state.random === "wild") {
-    // wild: also add a mash-up note before the climax
-    return [{ speaker: "NARRATOR", text: "(suddenly, in a way no one expected, the world tilts a little — and a wild detail enters the scene)", direction: undefined }, ...lines];
+    return [{ speaker: "NARRATOR", text: "Suddenly — in a way no one expected — the world tilts a little, and something new enters the scene.", direction: undefined }, ...lines];
   }
   return lines;
 }
