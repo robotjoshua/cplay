@@ -1,0 +1,2753 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>C.Play — Children's Play Generator (offline)</title>
+<style>
+  :root {
+    --bg: #d8d4c7;
+    --paper: #f8f5ec;
+    --panel: #ddd8cb;
+    --ink: #1c1a16;
+    --muted: #807a70;
+    --accent: #2c2a26;
+    --accent-soft: #e2ddcd;
+    --accent2: #44423c;
+    --gold: #6f6353;
+    --line: #c6bfae;
+    --line-soft: #d6cfbd;
+    --good: #4a5042;
+    --warn: #6a4a38;
+    --shadow: 0 1px 0 rgba(0,0,0,.02), 0 6px 20px rgba(50,42,28,.08), 0 24px 48px rgba(50,42,28,.04);
+    --serif: "Iowan Old Style", "Source Serif Pro", Georgia, "Hoefler Text", serif;
+    --display: "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
+    --sans: "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
+    --script: "Courier Prime", "Courier Final Draft", "Courier New", Courier, ui-monospace, monospace;
+    --c1:#4a2f1e; --c2:#233834; --c3:#3a2a3e; --c4:#3e3320;
+    --c5:#1f2a3a; --c6:#3e2730; --c7:#2c3a26; --c8:#2c2218;
+    --cN:#9a948a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); }
+  body { display: grid; grid-template-columns: 380px 1fr; min-height: 100vh; }
+  @media (max-width: 900px) { body { grid-template-columns: 1fr; } }
+
+  body { font-family: var(--sans); }
+  aside.controls {
+    background: var(--panel); border-right: 1px solid var(--line);
+    padding: 22px 24px 22px; overflow: hidden; height: 100vh;
+    position: sticky; top: 0;
+    display: flex; flex-direction: column;
+  }
+  aside .scroll {
+    flex: 0 1 auto; overflow-y: auto; min-height: 0;
+    margin: 0 -24px; padding: 0 24px;
+  }
+  aside .filler { flex: 1 1 auto; }
+  /* Hide scrollbar visually but keep functionality if content does overflow */
+  aside .scroll::-webkit-scrollbar { width: 0; height: 0; }
+  aside .scroll { scrollbar-width: none; }
+  @media (max-width: 900px) { aside.controls { height: auto; position: static; overflow: visible; } aside .scroll { overflow: visible; } }
+  aside h1 { margin: 0 0 4px; font-family: var(--display); font-size: 20px; letter-spacing: 1px; text-transform: uppercase; }
+  aside .tagline { color: var(--muted); font-size: 11px; margin-bottom: 14px; letter-spacing: .5px; }
+
+  /* Accordion sections */
+  details.section {
+    border-top: 1px solid var(--line); padding: 0;
+  }
+  details.section:first-of-type { border-top: 0; }
+  details.section > summary {
+    list-style: none; cursor: pointer;
+    padding: 14px 0; display: flex; align-items: center; justify-content: space-between;
+    user-select: none;
+  }
+  details.section > summary::-webkit-details-marker { display: none; }
+  details.section > summary h2 {
+    margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--muted); font-weight: 700;
+  }
+  details.section > summary .summary-state {
+    color: var(--muted); font-size: 18px; font-family: var(--sans); font-weight: 400;
+    transition: transform .15s;
+  }
+  details.section[open] > summary .summary-state { transform: rotate(45deg); }
+  details.section[open] > summary { padding-bottom: 6px; }
+  details.section > .body { padding-bottom: 14px; }
+  details.section[open] > summary h2 { color: var(--ink); }
+  label { display: block; font-size: 13px; margin: 16px 0 8px; letter-spacing: .3px; }
+  label:first-child, .section h2 + label { margin-top: 0; }
+  label .hint { color: var(--muted); font-weight: 400; font-size: 12px; text-transform: none; letter-spacing: 0; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 2px;
+    background: var(--paper); font-family: var(--sans); font-size: 14px; color: var(--ink);
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 10px; }
+  .chip {
+    font-size: 13px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 2px;
+    background: var(--paper); cursor: pointer; user-select: none; font-family: var(--sans);
+    color: var(--ink); letter-spacing: .4px; font-weight: 500;
+    transition: border-color .12s, background .12s;
+  }
+  .chip:hover { border-color: var(--ink); }
+  .chip[aria-pressed="true"] { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .list .item { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 10px; }
+  .list .item.simple { grid-template-columns: 1fr auto; }
+  .list .item button.del {
+    background: transparent; border: 1px solid var(--line); border-radius: 2px;
+    width: 40px; cursor: pointer; color: var(--muted); font-family: var(--sans); font-size: 16px;
+  }
+  .list .item button.del:hover { color: var(--ink); border-color: var(--ink); }
+  .add-btn {
+    background: transparent; border: 1px dashed var(--line); border-radius: 2px;
+    padding: 12px; font-size: 13px; cursor: pointer; color: var(--muted); width: 100%;
+    font-family: var(--sans); letter-spacing: .4px; margin-top: 6px;
+  }
+  .add-btn:hover { color: var(--ink); border-color: var(--ink); }
+  .lock-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .lock {
+    font-size: 12px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 2px;
+    background: var(--paper); cursor: pointer; user-select: none; color: var(--muted);
+    font-family: var(--sans); letter-spacing: .4px;
+  }
+  .lock[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--ink); color: var(--ink); }
+
+  .actions {
+    margin: 16px 0 0; padding: 16px 0 0;
+    border-top: 1px solid var(--line);
+    display: flex; gap: 12px;
+  }
+  button.primary, button.secondary {
+    flex: 1; padding: 16px 18px; border-radius: 2px; cursor: pointer; font-weight: 700;
+    border: 1px solid var(--accent); font-size: 13px; font-family: var(--sans);
+    letter-spacing: 1.4px; text-transform: uppercase;
+  }
+  button.primary { background: var(--accent); color: var(--paper); }
+  button.primary:hover { background: var(--ink); }
+  button.secondary { background: var(--paper); color: var(--ink); }
+  button.secondary:hover { background: var(--accent-soft); }
+
+  main {
+    padding: 16px 28px 24px; max-width: 1000px; margin: 0 auto; width: 100%;
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    position: relative;
+  }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .topbar .left { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .topbar #docTitle { font-size: 14px; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; letter-spacing: 1px; }
+  .topbar .right { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .iconbtn {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 2px;
+    padding: 5px 10px; font-size: 10px; cursor: pointer; color: var(--ink);
+    font-family: var(--sans); letter-spacing: .6px; text-transform: uppercase;
+    transition: border-color .15s, background .15s;
+  }
+  .iconbtn:hover { border-color: var(--ink); }
+
+  /* Rehearsal selector — inline in nav */
+  .rehearsal-bar { display: none; align-items: center; gap: 6px; }
+  .rehearsal-bar.show { display: inline-flex; }
+  .rehearsal-bar label {
+    margin: 0; font-size: 10px; letter-spacing: .6px;
+    text-transform: uppercase; color: var(--muted); font-weight: 700;
+  }
+  .rehearsal-bar select {
+    padding: 4px 8px; border: 1px solid var(--line); border-radius: 2px;
+    font-family: var(--sans); font-size: 10px; background: var(--paper);
+    text-transform: uppercase; letter-spacing: .6px; color: var(--ink);
+    max-width: 140px;
+  }
+  .rehearsal-bar .hint, .rehearsal-bar .clear { display: none; }
+
+  .empty {
+    padding: 100px 36px; text-align: center; color: var(--muted);
+    background: var(--paper); border: 1px solid var(--line); border-radius: 2px;
+  }
+  .empty .curtain { width: 48px; height: 48px; margin: 0 auto 18px; color: var(--ink); opacity: .5; }
+  .empty h2 {
+    font-family: var(--display); font-size: 18px; margin: 0 0 8px; color: var(--ink);
+    text-transform: uppercase; letter-spacing: 3px; font-weight: 700;
+  }
+  .empty p { font-size: 13px; line-height: 1.6; max-width: 40ch; margin: 0 auto; font-family: var(--script); }
+
+  /* ====== Document = pages, one shown at a time ====== */
+  .doc { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+  /* Page navigation bar */
+  .page-nav {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 6px 10px; background: var(--paper);
+    border: 1px solid var(--line); border-radius: 2px;
+    font-family: var(--sans); font-size: 10px; letter-spacing: .6px; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .page-nav .reh-spacer { flex: 1; }
+  .page-nav select {
+    padding: 4px 8px; border: 1px solid var(--line); border-radius: 2px;
+    background: var(--paper); font-family: var(--sans); font-size: 10px;
+    text-transform: uppercase; letter-spacing: .6px; color: var(--ink); cursor: pointer;
+    max-width: 220px;
+  }
+  .page-nav button {
+    padding: 4px 9px; border: 1px solid var(--line); border-radius: 2px;
+    background: var(--paper); font-family: var(--sans); font-size: 10px; cursor: pointer;
+    color: var(--ink); letter-spacing: .6px; text-transform: uppercase;
+  }
+  .page-nav button:hover { border-color: var(--ink); }
+  .page-nav button:disabled { opacity: .35; cursor: not-allowed; }
+  .page-nav .counter { color: var(--muted); }
+
+  /* Page paper — 8.5x11 ratio, sized to fit BOTH viewport dimensions */
+  .page-paper {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    box-shadow: var(--shadow);
+    padding: 5% 7% 6%;
+    font-family: var(--script);
+    line-height: 1.5;
+    color: var(--ink);
+    position: relative;
+    display: none;
+    /* Take the smaller of: hard cap, full main width, or what aspect-ratio allows for the viewport height */
+    width: min(720px, 100%, calc((100vh - 160px) * 0.7727));
+    aspect-ratio: 8.5 / 11;
+    margin: 0 auto;
+    overflow: hidden;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    flex-grow: 0;
+  }
+  .page-paper.is-active { display: flex; flex-direction: column; }
+  @media (max-width: 560px) {
+    .page-paper { padding: 24px 20px 32px; height: auto; aspect-ratio: auto; max-width: 100%; }
+  }
+
+  /* Floating page-flip arrows (left/right of the page, anchored to main) */
+  .flip {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--paper); border: 1px solid var(--line);
+    color: var(--ink); cursor: pointer;
+    font-family: var(--sans); font-size: 22px; line-height: 1;
+    display: none; align-items: center; justify-content: center;
+    box-shadow: var(--shadow); z-index: 4;
+  }
+  .flip:hover { border-color: var(--ink); background: var(--accent-soft); }
+  .flip:disabled { opacity: .25; cursor: not-allowed; }
+  .flip.show { display: flex; }
+  .flip.left { left: 4px; }
+  .flip.right { right: 4px; }
+  @media (max-width: 700px) { .flip { display: none !important; } }
+  .page-paper .page-num {
+    position: absolute; bottom: 18px; right: 22px;
+    font-family: var(--script); font-size: 9px; color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .page-paper .page-running {
+    position: absolute; top: 18px; left: 22px;
+    font-family: var(--script); font-size: 8.5px; color: var(--muted);
+    letter-spacing: 1.2px; text-transform: uppercase;
+  }
+  .page-paper .page-running.right { left: auto; right: 22px; top: 18px; }
+
+  /* Cover block — title page */
+  .cover {
+    text-align: center; padding: 100px 0 60px;
+    display: flex; flex-direction: column; gap: 20px; align-items: center;
+  }
+  .eyebrow {
+    font-family: var(--sans); font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; margin: 0;
+  }
+  .play-title {
+    font-family: var(--display); font-size: 32px; line-height: 1.2; margin: 0 auto;
+    max-width: 26ch; letter-spacing: 1px; color: var(--ink); font-weight: 700;
+    text-transform: uppercase;
+  }
+  .cover .rule {
+    width: 36px; height: 1px; background: var(--ink); margin: 4px auto;
+  }
+  .logline {
+    font-style: italic; font-size: 14px; color: var(--ink);
+    margin: 0 auto; max-width: 48ch; font-family: var(--script);
+  }
+  .meta-row {
+    font-family: var(--sans); font-size: 10px; color: var(--muted);
+    letter-spacing: 2px; text-transform: uppercase; margin-top: 24px;
+  }
+  .meta-row .dot { margin: 0 8px; opacity: .5; }
+
+  /* Teacher's note */
+  .teacher-note {
+    background: var(--accent-soft); border: 1px solid var(--line);
+    border-radius: 2px; padding: 10px 14px; margin: 12px 0 0;
+    font-family: var(--script); font-size: 13px; line-height: 1.45;
+  }
+  .teacher-note .label {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; margin-bottom: 6px;
+  }
+
+  /* Section headers */
+  .section-h {
+    font-family: var(--sans); font-size: 10px; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--muted); font-weight: 700;
+    text-align: center; margin: 18px 0 8px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* Cast — compact list, monospace */
+  .cast-grid {
+    display: grid; grid-template-columns: 1fr;
+    row-gap: 6px; margin: 0 0 8px; font-family: var(--script);
+  }
+  .cast-card {
+    display: grid; grid-template-columns: 14px 1fr auto; gap: 12px; padding: 6px 0;
+    align-items: baseline; border-bottom: 1px dotted var(--line);
+  }
+  .cast-card .avatar {
+    height: 8px; width: 8px; border-radius: 50%;
+    background: var(--ch, var(--muted)); align-self: center;
+    color: transparent; user-select: none; font-size: 0;
+    display: block; margin: 0;
+  }
+  .cast-card .info { min-width: 0; font-size: 13px; line-height: 1.4; }
+  .cast-card .name {
+    font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 1px;
+    font-size: 12px;
+  }
+  .cast-card .desc { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .cast-card .lines-right {
+    font-size: 11px; color: var(--muted); white-space: nowrap; letter-spacing: .5px;
+  }
+
+  /* Props list — monospace */
+  .prop-chips {
+    list-style: none; padding: 0; margin: 0;
+    font-family: var(--script); font-size: 13px; columns: 2; column-gap: 32px;
+    color: var(--ink);
+  }
+  .prop-chips li { padding: 3px 0; break-inside: avoid; }
+  .prop-chips li::before { content: "·  "; color: var(--muted); }
+
+  .setting-block {
+    font-style: italic; color: var(--ink);
+    margin: 0; font-size: 14px; font-family: var(--script);
+  }
+
+  /* Acts and scenes */
+  .act-block { margin-top: 0; }
+  .act-h {
+    font-family: var(--display); font-size: 13px; text-align: center;
+    margin: 0 0 2px; letter-spacing: 3px; color: var(--ink);
+    text-transform: uppercase; font-weight: 700;
+  }
+  .act-h .num {
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); display: block; margin-bottom: 2px;
+    font-family: var(--sans); font-weight: 700;
+  }
+  .act-rule { display: none; }
+
+  .scene-block { margin-top: 12px; }
+  .scene-h {
+    font-family: var(--sans); font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase;
+    color: var(--muted); margin: 8px 0 4px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .scene-h button { font-size: 9px; padding: 3px 7px; }
+  .scene-loc {
+    font-family: var(--script); font-size: 11px; color: var(--ink);
+    text-align: center; margin: 2px 0 2px; text-transform: uppercase; letter-spacing: .5px;
+  }
+  .scene-od {
+    font-family: var(--script); color: var(--muted); margin: 0 auto 8px;
+    text-align: center; font-size: 11px; max-width: 64ch; line-height: 1.45;
+  }
+
+  /* Lines — real-script density, Courier body */
+  .line {
+    display: grid; grid-template-columns: 92px 1fr; gap: 10px;
+    padding: 1px 0; align-items: baseline;
+    transition: opacity .15s, background .15s;
+  }
+  .line + .line { margin-top: 0; }
+  .line .speaker {
+    font-family: var(--script); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .4px;
+    padding-top: 1px; color: var(--ch, var(--ink)); text-align: right;
+  }
+  .line .speaker select {
+    width: 100%; padding: 1px 2px; font-family: var(--script); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .4px; border: 1px solid transparent;
+    background: transparent; color: inherit; cursor: pointer; text-align: right;
+    text-align-last: right;
+  }
+  .line .speaker select:hover { border-color: var(--line); background: var(--paper); }
+  .line .text {
+    font-family: var(--script); font-size: 11.5px; outline: none; padding: 1px 4px; border-radius: 3px;
+    line-height: 1.45;
+  }
+  .line .text:focus, .line .text:hover { background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); }
+  .line .direction {
+    font-family: var(--script); font-style: italic; color: var(--muted);
+    display: block; font-size: 10.5px;
+    padding: 0 4px; margin-top: 0;
+  }
+  .line.narrator .speaker { color: var(--muted); font-style: italic; font-weight: 600; }
+  .line.all .speaker { color: var(--accent2); font-weight: 800; letter-spacing: 1.2px; }
+
+  /* Rehearsal dimming */
+  body.rehearse-on .line:not(.spotlight) { opacity: .22; }
+  body.rehearse-on .line.spotlight { background: var(--accent-soft); }
+  body.rehearse-on .line.spotlight .text { font-weight: 600; }
+
+  .end-mark {
+    text-align: center; font-family: var(--script);
+    color: var(--muted); margin-top: 24px; padding-top: 16px;
+    font-size: 12px; letter-spacing: 6px; text-transform: uppercase;
+  }
+
+  .editable { outline: none; border-radius: 4px; padding: 1px 4px; }
+  .editable:focus, .editable:hover { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+
+  .library { margin-top: 28px; }
+  .library h2 { font-family: var(--sans); font-size: 11px; text-transform: uppercase; letter-spacing: 1.6px; color: var(--muted); margin: 0 0 8px; }
+  .library .lib-item {
+    display: flex; justify-content: space-between; align-items: center; padding: 8px 12px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--paper); margin-bottom: 6px; font-size: 13px;
+  }
+  .library .lib-item button { background: transparent; border: 0; cursor: pointer; color: var(--muted); }
+  .library .lib-item button:hover { color: var(--ink); }
+
+  #status { font-size: 12px; color: var(--muted); margin-left: 8px; min-height: 16px; }
+  #status.error { color: var(--warn); }
+  #status.success { color: var(--good); }
+
+  /* ===== Mobile breakpoints ===== */
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; min-height: 0; }
+    /* Hide the topbar action buttons when no play exists — they're useless */
+    body:not(.has-play) main .topbar { display: none; }
+    aside.controls {
+      height: auto; position: static; overflow: visible;
+      padding: 12px 14px 14px;
+      border-right: 0; border-bottom: 1px solid var(--line);
+    }
+    aside .scroll { overflow: visible; }
+    aside h1 { font-size: 16px; margin-bottom: 2px; }
+    aside .tagline { margin-bottom: 6px; font-size: 11px; }
+    aside details.section > summary { padding: 10px 0; }
+    aside .actions { margin: 10px 0 0; padding: 10px 0 0; }
+    main {
+      padding: 12px 14px 24px;
+      height: auto; min-height: 0;
+      overflow: visible;
+    }
+    .page-paper {
+      width: min(100%, calc((100vh - 220px) * 0.7727));
+    }
+    .empty {
+      padding: 28px 18px; min-height: 0;
+    }
+    .empty .curtain { width: 36px; height: 36px; margin-bottom: 8px; }
+    .empty h2 { font-size: 14px; }
+    .empty p { font-size: 12.5px; }
+    .topbar { margin-bottom: 8px; }
+  }
+  @media (max-width: 600px) {
+    /* Prevent iOS Safari auto-zoom on focus: all editable controls at >=16px */
+    input[type=text], input[type=number], select, textarea {
+      font-size: 16px;
+    }
+    .line .text, .line .speaker select, .line .direction,
+    .editable, [contenteditable="true"] {
+      font-size: 16px;
+    }
+    .page-nav select, .rehearsal-bar select { font-size: 16px; }
+    .topbar { gap: 8px; }
+    .topbar .left { width: 100%; }
+    .topbar #docTitle { font-size: 12px; max-width: 100%; }
+    .topbar .right { width: 100%; gap: 4px; }
+    .iconbtn { padding: 6px 8px; font-size: 9.5px; flex: 1; min-width: 0; text-align: center; }
+    .page-nav {
+      flex-wrap: wrap; gap: 6px;
+      padding: 6px 8px;
+    }
+    .page-nav .counter { font-size: 9.5px; }
+    .page-nav select { font-size: 9.5px; padding: 4px 6px; max-width: 100%; flex: 1 1 100%; order: 2; }
+    .page-nav .reh-spacer { display: none; }
+    .rehearsal-bar { width: 100%; order: 3; padding-top: 4px; border-top: 1px solid var(--line-soft); }
+    .rehearsal-bar select { flex: 1; max-width: none; }
+    /* Bigger touch targets for chip controls */
+    .chip { padding: 12px 16px; font-size: 14px; }
+    .lock { padding: 10px 14px; font-size: 13px; }
+    button.primary, button.secondary { padding: 18px 18px; font-size: 14px; }
+    .actions { gap: 8px; }
+  }
+  @media (max-width: 560px) {
+    .page-paper {
+      padding: 22px 18px 30px; height: auto; aspect-ratio: auto;
+      width: 100%; max-width: 100%;
+      min-height: calc(100vh - 240px);
+    }
+    /* Hide floating side arrows; the top page-nav has prev/next */
+    .flip { display: none !important; }
+    /* Cast as single column rows */
+    .cast-grid { grid-template-columns: 1fr; }
+    /* Props in one column on phones */
+    .prop-chips { columns: 1; }
+  }
+
+  /* ===== Print: show all pages ===== */
+  @media print {
+    body { display: block; background: #fff; }
+    aside.controls, .topbar, .library, .scene-h button, .rehearsal-bar, .page-nav { display: none !important; }
+    main { padding: 0; max-width: none; }
+    .doc { display: block; }
+    .page-paper { display: block !important; box-shadow: none; border: 0; padding: 0.6in 0.8in; page-break-after: always; max-width: none; }
+    .page-paper:last-child { page-break-after: auto; }
+    .scene-h, .act-h { page-break-after: avoid; }
+    .line { page-break-inside: avoid; }
+    body.rehearse-on .line:not(.spotlight) { opacity: 1; }
+    body.rehearse-on .line.spotlight { background: none; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="controls">
+  <h1>C.Play</h1>
+  <div class="tagline">Offline children's play generator · K&ndash;5</div>
+
+  <div class="scroll">
+    <details class="section" open>
+      <summary><h2>Audience &amp; Length</h2><span class="summary-state">+</span></summary>
+      <div class="body">
+        <label>Grade band</label>
+        <div class="chips" data-chips="gradeBand">
+          <button class="chip" data-val="K-2">K&ndash;2</button>
+          <button class="chip" data-val="3-5" aria-pressed="true">3&ndash;5</button>
+        </div>
+        <label>Length</label>
+        <div class="chips" data-chips="length">
+          <button class="chip" data-val="short" aria-pressed="true">Short</button>
+          <button class="chip" data-val="medium">Medium</button>
+          <button class="chip" data-val="long">Long</button>
+        </div>
+        <div class="row">
+          <div>
+            <label>Cast size</label>
+            <input type="number" id="castSize" min="2" max="20" value="5" />
+          </div>
+          <div>
+            <label>Lines balance</label>
+            <select id="balance">
+              <option value="even">Spread evenly</option>
+              <option value="lead">Leads + supporting</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="section">
+      <summary><h2>Story Bones</h2><span class="summary-state">+</span></summary>
+      <div class="body">
+        <label>Lesson / theme</label>
+        <select id="lesson">
+          <option value="kindness">kindness</option>
+          <option value="honesty">honesty</option>
+          <option value="courage">courage</option>
+          <option value="friendship">friendship</option>
+          <option value="perseverance">perseverance</option>
+          <option value="sharing">sharing</option>
+          <option value="teamwork">teamwork</option>
+          <option value="environment">caring for the environment</option>
+          <option value="inclusion">inclusion &amp; belonging</option>
+          <option value="responsibility">responsibility</option>
+          <option value="patience">patience</option>
+          <option value="gratitude">gratitude</option>
+        </select>
+
+        <label>Tone</label>
+        <div class="chips" data-chips="tone">
+          <button class="chip" data-val="silly" aria-pressed="true">Silly</button>
+          <button class="chip" data-val="heartfelt">Heartfelt</button>
+          <button class="chip" data-val="adventurous">Adventurous</button>
+          <button class="chip" data-val="mysterious">Mysterious</button>
+          <button class="chip" data-val="fairytale">Fairytale</button>
+        </div>
+
+        <label>Conflict type</label>
+        <div class="chips" data-chips="conflict">
+          <button class="chip" data-val="vs-self" aria-pressed="true">Inner</button>
+          <button class="chip" data-val="vs-other">Vs. other</button>
+          <button class="chip" data-val="vs-nature">Vs. nature</button>
+          <button class="chip" data-val="vs-group">Vs. group</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="section">
+      <summary><h2>Setting</h2><span class="summary-state">+</span></summary>
+      <div class="body">
+        <div class="chips" id="settingChips">
+          <button class="chip" data-val="enchanted forest">Forest</button>
+          <button class="chip" data-val="schoolyard">Schoolyard</button>
+          <button class="chip" data-val="kingdom castle">Castle</button>
+          <button class="chip" data-val="outer space">Space</button>
+          <button class="chip" data-val="under the sea">Underwater</button>
+          <button class="chip" data-val="farm">Farm</button>
+          <button class="chip" data-val="jungle">Jungle</button>
+          <button class="chip" data-val="cozy neighborhood">Neighborhood</button>
+          <button class="chip" data-val="desert island">Island</button>
+        </div>
+        <input type="text" id="setting" placeholder="Or type a setting…" />
+      </div>
+    </details>
+
+    <details class="section">
+      <summary><h2>Characters &amp; Props</h2><span class="summary-state">+</span></summary>
+      <div class="body">
+        <label>Characters <span class="hint">(name + hint, optional)</span></label>
+        <div class="list" id="characterList"></div>
+        <button class="add-btn" id="addCharacter">+ Add character</button>
+        <label style="margin-top:14px">Props</label>
+        <div class="list" id="propList"></div>
+        <button class="add-btn" id="addProp">+ Add prop</button>
+      </div>
+    </details>
+
+    <details class="section">
+      <summary><h2>Storytelling Tools</h2><span class="summary-state">+</span></summary>
+      <div class="body">
+        <div class="row">
+          <div>
+            <label>Narrator</label>
+            <select id="narrator">
+              <option value="off">Off</option>
+              <option value="light" selected>Light</option>
+              <option value="prominent">Prominent</option>
+            </select>
+          </div>
+          <div>
+            <label>Stage directions</label>
+            <select id="directions">
+              <option value="minimal">Minimal</option>
+              <option value="standard" selected>Standard</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          </div>
+        </div>
+        <label style="margin-top:10px"><input type="checkbox" id="songs" /> Include short rhyme/chant</label>
+      </div>
+    </details>
+
+    <details class="section">
+      <summary><h2>Randomness &amp; Seed</h2><span class="summary-state">+</span></summary>
+      <div class="body">
+        <label>Random tier</label>
+        <div class="chips" data-chips="random">
+          <button class="chip" data-val="none" aria-pressed="true">None</button>
+          <button class="chip" data-val="spicy">Twist</button>
+          <button class="chip" data-val="wild">Wild</button>
+        </div>
+        <label>Lock when re-rolling <span class="hint">— keep these, regen rest</span></label>
+        <div class="lock-row" id="lockRow">
+          <button class="lock" data-lock="characters">Characters</button>
+          <button class="lock" data-lock="props">Props</button>
+          <button class="lock" data-lock="setting">Setting</button>
+          <button class="lock" data-lock="lesson">Lesson</button>
+        </div>
+        <label style="margin-top:10px">Seed <span class="hint">— same seed = same play</span></label>
+        <div class="row">
+          <input type="text" id="seed" placeholder="(blank = random)" />
+          <button class="iconbtn" id="randSeed">New seed</button>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="actions">
+    <button class="secondary" id="surpriseMe">Surprise me</button>
+    <button class="primary" id="generate">Generate play</button>
+  </div>
+  <div class="filler"></div>
+</aside>
+
+<main>
+  <div class="topbar">
+    <div class="left">
+      <strong id="docTitle" style="font-family: var(--display); font-size: 20px;">No play yet</strong>
+      <span id="status"></span>
+    </div>
+    <div class="right">
+      <button class="iconbtn" id="saveLib">★ Save</button>
+      <button class="iconbtn" id="copyTxt">Copy text</button>
+      <button class="iconbtn" id="downloadTxt">Download .txt</button>
+      <button class="iconbtn" id="pdfBtn">📄 PDF</button>
+      <button class="iconbtn" id="printBtn">🖨 Print</button>
+      <button class="iconbtn" id="newPlay">New</button>
+    </div>
+  </div>
+
+  <button class="flip left" id="flipLeft" aria-label="Previous page">‹</button>
+  <button class="flip right" id="flipRight" aria-label="Next page">›</button>
+
+  <div id="output" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+    <div class="empty">
+      <svg class="curtain" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M8 8h48v6H8z" fill="currentColor"/>
+        <path d="M10 14c4 12 4 28 0 44h12c-2-14-2-28 0-44H10zm32 0c-2 16-2 30 0 44h12c-4-16-4-32 0-44H42z" fill="currentColor" opacity=".85"/>
+        <path d="M22 14c2 14 2 28 0 44h20c-2-16-2-30 0-44H22z" fill="currentColor" opacity=".55"/>
+      </svg>
+      <h2>Pick your pieces, press Generate.</h2>
+      <p>You'll get a full playbill — cover, cast cards, props, and a polished script — all editable.
+        Rename a character once, every line updates.</p>
+    </div>
+  </div>
+
+  <div class="library" id="library"></div>
+</main>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  gradeBand: "3-5",
+  length: "short",
+  castSize: 5,
+  balance: "even",
+  lesson: "kindness",
+  tone: "silly",
+  conflict: "vs-self",
+  setting: "",
+  characters: [],   // [{name, hint}]
+  props: [],        // [string]
+  narrator: "light",
+  directions: "standard",
+  songs: false,
+  random: "none",
+  locks: { characters: false, props: false, setting: false, lesson: false },
+  seed: "",
+  play: null,
+};
+
+/* ============================================================
+   SEEDED RNG (mulberry32 + string hash)
+   ============================================================ */
+function hashString(s) {
+  let h = 1779033703 ^ s.length;
+  for (let i = 0; i < s.length; i++) {
+    h = Math.imul(h ^ s.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return (h ^= h >>> 16) >>> 0;
+}
+function makeRng(seedStr) {
+  let s = hashString(seedStr || String(Math.random()));
+  return function() {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rng = makeRng("");
+
+const pick = arr => arr[Math.floor(rng() * arr.length)];
+const pickN = (arr, n) => {
+  const c = arr.slice();
+  const out = [];
+  while (out.length < n && c.length) out.push(c.splice(Math.floor(rng() * c.length), 1)[0]);
+  return out;
+};
+const chance = p => rng() < p;
+
+/* ============================================================
+   CONTENT TABLES
+   ============================================================ */
+
+// Setting library: speciesPool used for character species, features for slot fills
+const SETTINGS = {
+  "enchanted forest": {
+    short: "the enchanted forest",
+    full: "an enchanted forest at the edge of the kingdom, full of mossy trees and golden fireflies",
+    speciesPool: ["fox","rabbit","owl","hedgehog","squirrel","badger","deer","toad","fawn","wood-sprite"],
+    features: ["the old oak","the firefly clearing","the mushroom ring","the hollow log","the brook"],
+    typicalProps: ["lantern","glowing acorn","wooden flute","silver leaf","feather charm","jar of fireflies"],
+    weather: ["misty","golden","dewy","silvery","moonlit"],
+  },
+  "schoolyard": {
+    short: "the schoolyard",
+    full: "the schoolyard at recess, ringed by oak trees and the chain-link fence",
+    speciesPool: ["third-grader","fifth-grader","kindergartener","new kid","crossing guard","cafeteria helper","class hamster (escaped)"],
+    features: ["the tetherball pole","the slide","the lunch table","the corner of the field","the kickball diamond"],
+    typicalProps: ["jump rope","kickball","library book","lunchbox","crayon drawing","whistle"],
+    weather: ["sunny","windy","cloudy","crisp","warm"],
+  },
+  "kingdom castle": {
+    short: "the castle",
+    full: "a stone castle on a green hill, where banners flap in the wind",
+    speciesPool: ["page","jester","royal cat","baker","knight in training","cook's helper","royal scribe"],
+    features: ["the great hall","the kitchen","the tower","the courtyard","the rose garden"],
+    typicalProps: ["wooden sword","silver crown","royal scroll","loaf of bread","jingle bells","feather quill"],
+    weather: ["bright","drizzly","golden","windy","stormy"],
+  },
+  "outer space": {
+    short: "the starship",
+    full: "the starship Wanderer, drifting between two friendly planets",
+    speciesPool: ["space cadet","robot helper","alien botanist","star captain","ship cat","junior engineer"],
+    features: ["the bridge","the greenhouse pod","the engine room","the viewport","the hangar"],
+    typicalProps: ["control panel","glowing crystal","star map","ration pouch","tool belt","helmet"],
+    weather: ["weightless","humming","blinking","cool","silent"],
+  },
+  "under the sea": {
+    short: "the reef",
+    full: "the coral reef where sunlight wiggles in golden ribbons",
+    speciesPool: ["octopus","sea turtle","clownfish","crab","seahorse","dolphin","starfish"],
+    features: ["the coral arch","the kelp forest","the sandy floor","the shipwreck","the tide pool"],
+    typicalProps: ["seashell","pearl","sunken locket","piece of net","glass bottle","bright pebble"],
+    weather: ["sun-rippled","cool","drifting","calm","swirly"],
+  },
+  "farm": {
+    short: "the farm",
+    full: "a small farm with a red barn and a long wooden fence",
+    speciesPool: ["pig","sheep","horse","farm dog","barn cat","rooster","goose","farmer"],
+    features: ["the barn","the chicken coop","the apple tree","the pond","the vegetable patch"],
+    typicalProps: ["bucket","apple","feed sack","straw hat","horseshoe","watering can"],
+    weather: ["sunny","muddy","breezy","crisp","hot"],
+  },
+  "jungle": {
+    short: "the jungle",
+    full: "a tangled green jungle where parrots argue with the wind",
+    speciesPool: ["monkey","toucan","sloth","tree frog","jaguar cub","beetle","baby elephant"],
+    features: ["the vine bridge","the great waterfall","the hidden glade","the buttress roots","the canopy"],
+    typicalProps: ["banana","map fragment","loud whistle","drum","jungle vine","painted stone"],
+    weather: ["steamy","drippy","loud","golden","cloudy"],
+  },
+  "cozy neighborhood": {
+    short: "the neighborhood",
+    full: "a cozy neighborhood with chalk on the sidewalks and a small bakery on the corner",
+    speciesPool: ["kid on a bike","crossing guard","bakery cat","letter carrier","dog","librarian","grandparent"],
+    features: ["the corner bakery","the front porch","the sidewalk","the little library","the playground"],
+    typicalProps: ["chalk","letter","cookie","library book","paper airplane","umbrella"],
+    weather: ["sunny","drizzly","windy","crisp","warm"],
+  },
+  "desert island": {
+    short: "the island",
+    full: "a tiny desert island with one palm tree and a circle of bright shells",
+    speciesPool: ["sea bird","crab","marooned sailor","parrot","sand turtle","castaway kid"],
+    features: ["the palm tree","the rocky cove","the shell circle","the tide line","the lookout dune"],
+    typicalProps: ["coconut","map","glass bottle","spyglass","driftwood stick","conch shell"],
+    weather: ["bright","breezy","steamy","cloudy","sunny"],
+  },
+};
+
+// Generic name pool — short, mostly gender-neutral
+const NAMES = [
+  "Robin","Wren","Sage","Pip","Bramble","Juno","Mo","Tilly","Ash","Fig",
+  "Quill","Otis","Pax","Lulu","Bingo","Ravi","Mae","Theo","Nova","Sasha",
+  "Beau","Hattie","Nico","Saffron","Jay","Coco","Reese","Marlo","Indigo","River",
+  "Sunny","Pebble","Honey","Tam","Olive","Bo","Wynn","Dusty","Fern","Rye",
+];
+
+// Word variants — picked when a {key} appears in a template
+const V = {
+  greeting: ["Hello","Hi","Hey","Good morning","Good day","Howdy","Hi there","Look","Heya","Good to see you","Top of the morning","Hey, you","Morning","Hiya","Salutations","Greetings","Why hello","Hey-o","Pssst","Yoo-hoo"],
+  weatherAdj: ["sunny","breezy","bright","cozy","crisp","fine","grand","perfectly nice","sparkly","golden","gentle","quiet","clear","mild","fresh","glowing","still","misty","warm","peaceful"],
+  timePhrase: [
+    "One sunny morning","On a perfectly ordinary day","One bright afternoon","Late one cozy day","Just past sunrise",
+    "On the kind of morning when nothing should go wrong","Right around lunchtime","Just before the day really got going",
+    "On a day no one had circled","On a day everyone had circled","One quiet Tuesday","On a long, slow afternoon",
+    "Early — earlier than usual","On a morning that smelled like rain","On a morning so still you could hear yourself think",
+    "On the second-best day of the week","One ordinary Wednesday","Right after breakfast","Just before dinner","On the kind of day stories start"
+  ],
+  transition: [
+    "Just then,","Suddenly,","At that very moment,","Without warning,","Right then,","And then —","So,",
+    "All at once,","In the middle of all this,","Out of nowhere,","No sooner had they spoken than","Quick as a wink,",
+    "Before anyone could blink,","And here is where things turn,","That's when","Right at that moment,","Before they knew it,",
+    "While they were busy worrying,","With the quietest little click,","Because of course,"
+  ],
+  exclaim: ["Oh!","Wow!","Yikes!","Whoa!","Hey!","Goodness!","Gosh!","Look out!","No way!","Hold on!","Heavens!","Oh my!","Aha!","Egads!","Holy moly!","Sweet!","Yipes!","Crikey!"],
+  pause: ["...","(beat)","(quiet for a moment)","(slowly)","(thinking)","(holding still)","(looking at the floor)","(deep breath)","(eyes wide)","(silent)","(swallowing hard)","(searching for words)"],
+  worry: ["worried","frowning","biting their lip","fidgeting","glancing around","pacing a little","wringing their hands","scrunching their nose","nervous","tugging at their sleeve","staring at their feet","barely breathing","tapping a foot","jaw tight"],
+  warmReact: ["smiling","beaming","with a soft laugh","grinning","with bright eyes","glowing","with a little hop","eyes twinkling","laughing softly","with a wide smile","light in their face","crinkling their nose","with a happy sigh"],
+  smallVoice: ["quietly","in a small voice","almost whispering","barely speaking","in a soft hush","under their breath","carefully","gently","just above a whisper","in a hesitant voice","in a half-voice"],
+  bigVoice: ["loudly","with a huge grin","cheerfully","with a flourish","at the top of their lungs","with both hands up","brightly","practically shouting","jumping","with arms thrown wide","triumphant"],
+  arrivalVerb: ["hurried in","wandered up","tumbled in","tiptoed in","marched up","peeked around the corner","stumbled over","skipped in","sneaked in","ambled up","bounded in","strolled in","trotted up","crashed in","glided in","poked their head in","slipped in"],
+  goalPhrase: ["finish my project","get this just right","figure it out","make it work","be ready in time","do this properly","practice my part","make today count","find the missing piece","prove I can","sort this out","not mess it up","catch up","get a fresh start","try one more time"],
+  questionStarter: ["Wait —","Hold on —","Hmm —","Hey —","Listen —","Hang on —","Pause —","One second —","Just a moment —","Sorry —","Excuse me —","Look,"],
+  agree: ["Right.","Exactly.","Yes!","Mm-hm.","Of course.","Sure thing.","You bet.","Absolutely.","Same here.","Couldn't agree more.","That tracks.","Fair enough.","Got it."],
+  resolveClose: [
+    "So that's how it went.","And that was that.","And the day was a little better for it.","And nothing was ever quite the same.",
+    "And the {settingShort} felt warmer than before.","And so the morning quietly turned into afternoon.","And the story went on, the way stories do.",
+    "And after that, things were different — in the way that matters.","And that, more or less, is how this one ends.",
+    "And no one would forget that day, even when they tried.","And the lesson, the small one, stayed.","And the {settingShort} kept its small new secret.",
+    "And so the day, somehow, was bigger when it ended than when it began."
+  ],
+  sigh: ["Phew.","Hmph.","Goodness.","Oh dear.","Yeesh.","Whew.","Welp.","Ugh.","Sheesh.","Hoo boy."],
+  brightClose: ["Together!","Yay!","Hooray!","All of us!","One more time!","Here we go!","Onward!","Look at us!","Right on!"],
+  promise: ["I promise.","Cross my heart.","Truly.","Word of honor.","For real.","I mean it.","I won't forget.","Pinky swear.","Believe me.","No fooling."],
+  reflection: ["I didn't see that coming.","Huh. I needed to hear that.","That was harder than I thought.","I almost missed it.","I'm glad I stopped.","I'm not the same as I was this morning.","I get it now."],
+  encouragement: ["You can do it.","I believe you.","Keep going.","I'm here.","Take your time.","One step at a time.","I've got you.","You're closer than you think."],
+  realization: ["Oh. Oh, I see.","Wait — that's it.","I get it now.","That's what they meant.","It clicks.","Of course. Of COURSE.","So THAT'S what was happening.","Now I understand."],
+  thanks: ["Thank you.","Thanks. I mean it.","I appreciate it.","That meant a lot.","I really mean it.","From me. Really."],
+  // Title-building word banks
+  titleVerb: ["Found","Mended","Saved","Almost Lost","Stood Up For","Spoke Up About","Made Peace With","Forgave","Returned","Discovered","Carried","Held On To","Let Go Of","Looked After"],
+  titleAdj: ["Quiet","Brave","Stubborn","Hopeful","Forgotten","Lonely","Curious","Last","Strange","Small","Bright","Tiny","Restless","Crooked","Plain","Mended"],
+  titleNoun: ["Day","Morning","Promise","Argument","Visit","Surprise","Mistake","Choice","Walk","Question","Idea","Trade"],
+};
+
+// Cross-shape title patterns — settingFeature1 already starts with "the X" so don't prepend "the"
+const GLOBAL_TITLES = [
+  "{hero} and the {titleAdj} {prop1}",
+  "{hero}'s {titleAdj} {titleNoun}",
+  "The Day {hero} {titleVerb} the {prop1}",
+  "How {hero} {titleVerb} the {prop1}",
+  "What Happened at {settingFeature1}",
+  "The {titleAdj} {prop1}",
+  "Trouble at {settingFeature1}",
+  "The {prop1} and the {prop2}",
+  "{hero}, {foil}, and the {prop1}",
+  "A {titleAdj} {titleNoun}",
+  "The {titleNoun} of the {prop1}",
+  "{hero} Goes to {settingFeature1}",
+  "Two Pockets, One {prop1}",
+  "Why {settingFeature1} Was Quiet",
+  "The {titleNoun} Nobody Expected",
+  "{hero} and {foil}",
+  "Before the {titleNoun}",
+  "{titleAdj}, {titleAdj}, {titleAdj}",
+];
+
+// Scene-opening direction banks — varies per scene for richer staging
+const SCENE_OPENINGS = {
+  bright: [
+    "Lights up. Morning sun spills across the {settingShort}.",
+    "Lights up. The {settingFeature1} is the brightest spot in the {settingShort}.",
+    "Lights up bright. The {settingShort} is alive with small motions.",
+  ],
+  later: [
+    "Lights shift to a softer, later-day glow over the {settingShort}.",
+    "Time has passed. Long shadows stretch across the {settingFeature1}.",
+    "Afternoon light. The {settingShort} has settled into its quieter rhythm.",
+  ],
+  tense: [
+    "Lights tighten on the {settingFeature1}. Something is about to happen.",
+    "Sound: a single note, held. Lights cool over the {settingShort}.",
+    "The {settingShort} feels different now. Watchful.",
+  ],
+  warm: [
+    "Lights ease back to warm. The {settingShort} feels like itself again.",
+    "A soft bell, somewhere. Light spreads gently across the {settingFeature1}.",
+    "Warm light returns to the {settingShort}, a little brighter than before.",
+  ],
+};
+
+// Tone modifiers — per tone, override or extend variant pools
+const TONES = {
+  silly: {
+    exclaim: ["BOING!","WHEEE!","BLORP!","Yowza!","Banana sandwich!","Gadzooks!"],
+    addons: { catchphrase: ["Wibble!","Oogabooga!","Bingo bongo!","Whatadingaling!"] },
+    transition: ["KABLAMO,","ZOINK,","Just then — POP! —","Suddenly (with a small honk),"],
+  },
+  heartfelt: {
+    exclaim: ["Oh.","Oh, friend.","Goodness.","My heart."],
+    pause: ["...","(a breath)","(softly)","(hand on heart)"],
+  },
+  adventurous: {
+    exclaim: ["Onward!","Look there!","To the {settingFeature}!","Adventure awaits!"],
+    transition: ["Onward they went —","With courage in their step,","Into the unknown,"],
+  },
+  mysterious: {
+    exclaim: ["Hush.","Listen...","Did you hear that?","Strange..."],
+    pause: ["...","(eyes wide)","(in a hush)","(slowly)"],
+  },
+  fairytale: {
+    greeting: ["Good morrow","Hail and well met","Greetings"],
+    timePhrase: ["Once upon a time","Long ago, in a land like ours","In the days of bright banners"],
+    exclaim: ["Lo!","Behold!","By the moon!","Verily!"],
+  },
+};
+
+// Lesson copy: takeaway + climax/resolution beats (2 variants each — picked at random)
+const LESSONS = {
+  kindness: {
+    label: "kindness",
+    takeaway: "Even when you're busy, taking a moment to help someone else changes the day for both of you.",
+    foilLabel: "the one who needs kindness",
+    climaxLines: [
+      {s:"hero", t:"Wait — {foil}, are you okay? You've been quiet."},
+      {s:"foil", t:"(small voice) Not really. I had a hard morning, and no one noticed.", d:"barely speaking"},
+      {s:"hero", t:"I'm sorry. I was so focused on my own thing. Sit with me. The rest can wait."},
+      {s:"foil", t:"(hands over {prop1}) I... I picked this up earlier. I think it's yours."},
+      {s:"hero", t:"Thank you. And — thank you for telling me. I see you now."},
+    ],
+    resolutionLines: [
+      {s:"friend", t:"Look — the {settingFeature1} is brighter than it was."},
+      {s:"N", t:"And that was how {hero} learned: kindness is mostly about noticing."},
+      {s:"ALL", t:"Together is better."},
+    ],
+    climaxLines2: [
+      {s:"hero", t:"({pause}) {foil}, can I sit here a minute? Just sit?"},
+      {s:"foil", t:"... if you want.", d:"surprised"},
+      {s:"hero", t:"I'm not going to fix anything. I'm just going to be here. Until you don't want me to be."},
+      {s:"foil", t:"(after a long beat) ... that's actually nice. Nobody does that."},
+      {s:"friend", t:"(walking up) Room for one more?"},
+    ],
+    resolutionLines2: [
+      {s:"N", t:"They sat there for a while. Nothing got fixed. But something got better anyway."},
+      {s:"foil", t:"Thanks. For not trying to make it better. Just for sitting."},
+      {s:"hero", t:"(soft) Anytime. I mean it."},
+    ],
+  },
+  honesty: {
+    label: "honesty",
+    takeaway: "Telling the truth is hard, but a small honest moment makes everything that comes after easier.",
+    foilLabel: "the friend who was wronged",
+    climaxLines: [
+      {s:"hero", t:"(quietly) Wait. {friend} — I have to tell you something. About the {prop1}."},
+      {s:"friend", t:"What about it?"},
+      {s:"hero", t:"I broke it. It was an accident, but — I knew. I let everyone think it was the wind."},
+      {s:"friend", t:"(pause) ... why didn't you say so?"},
+      {s:"hero", t:"I was scared. I'm sorry. I wanted to tell the truth, all morning. I just couldn't open my mouth."},
+      {s:"friend", t:"Thank you for telling me now. That's the part that matters."},
+    ],
+    resolutionLines: [
+      {s:"N", t:"And the {prop1} could be fixed. The hard part — saying it out loud — was already done."},
+      {s:"ALL", t:"Truth, even when it shakes."},
+    ],
+    climaxLines2: [
+      {s:"foil", t:"So — anyone want to confess about the {prop1}?", d:"crossing arms"},
+      {s:"hero", t:"({pause}) ... I wasn't going to say.", d:"{worry}"},
+      {s:"friend", t:"{hero}?"},
+      {s:"hero", t:"It was me. I'm the one. I just — I really wanted to use it, and I didn't ask."},
+      {s:"foil", t:"(softer) ... thanks for saying it."},
+      {s:"hero", t:"I should've said it sooner. I'm sorry."},
+    ],
+    resolutionLines2: [
+      {s:"N", t:"It wasn't easy to say. But the morning felt lighter once it was said."},
+      {s:"friend", t:"Honest is hard. Honest is good."},
+    ],
+  },
+  courage: {
+    label: "courage",
+    takeaway: "Brave isn't being unafraid — it's doing the right thing while your knees are shaking.",
+    foilLabel: "the friend in trouble",
+    climaxLines: [
+      {s:"hero", t:"(staring at {settingFeature1}) I don't want to go in there."},
+      {s:"friend", t:"Then don't. We'll find another way."},
+      {s:"hero", t:"No. {foil} is in there. And no one else can fit."},
+      {s:"hero", t:"(deep breath) Okay. I am scared. I am going anyway.", d:"shaking but standing tall"},
+      {s:"foil", t:"({hero}!) You came!"},
+      {s:"hero", t:"Of course I came. Take my hand. Slowly. We go together."},
+    ],
+    resolutionLines: [
+      {s:"N", t:"And though {hero}'s knees were shaking the whole time, the going was the brave part."},
+      {s:"friend", t:"That's the bravest thing I've ever seen."},
+      {s:"hero", t:"I was so scared. I just didn't let scared decide."},
+    ],
+    climaxLines2: [
+      {s:"hero", t:"({smallVoice}) I have to say something. And I don't WANT to say it.", d:"hands shaking"},
+      {s:"friend", t:"You don't have to right now."},
+      {s:"hero", t:"Yes I do. (out loud) That isn't fair. We can't leave them out."},
+      {s:"foil", t:"(stunned) ... you're serious?"},
+      {s:"hero", t:"I'm serious. And I'm scared. Both at once."},
+    ],
+    resolutionLines2: [
+      {s:"friend", t:"That took guts."},
+      {s:"hero", t:"My voice shook the whole time."},
+      {s:"N", t:"And the room got a little quieter, the way rooms do when something true gets said."},
+    ],
+  },
+  friendship: {
+    label: "friendship",
+    takeaway: "Real friendship begins when you choose someone — and then keep choosing them on hard days.",
+    foilLabel: "the new face",
+    climaxLines: [
+      {s:"hero", t:"I was wrong about you. I thought you were... I don't know. Different from us."},
+      {s:"foil", t:"I am different. That's not a bad thing."},
+      {s:"hero", t:"No — I mean, I think that's why I want to know you. Will you sit with us?"},
+      {s:"foil", t:"(holding out {prop1}) I made this. For our first day as friends. If you want."},
+      {s:"hero", t:"I want."},
+    ],
+    resolutionLines: [
+      {s:"friend", t:"Three is better than two, anyway."},
+      {s:"N", t:"And so a friendship started — small, real, and made for keeping."},
+    ],
+    climaxLines2: [
+      {s:"hero", t:"You're mad at me, aren't you."},
+      {s:"foil", t:"I'm not MAD. I'm — I don't know. You forgot."},
+      {s:"hero", t:"I did. I forgot. And I'm sorry. That's not the kind of friend I want to be."},
+      {s:"foil", t:"(pause) ... I just wanted you to remember on your own."},
+      {s:"hero", t:"Next time I will. Tell me when I miss things. I'll learn."},
+    ],
+    resolutionLines2: [
+      {s:"N", t:"Friendship isn't about never messing up. It's about coming back."},
+      {s:"foil", t:"You want to walk home together?"},
+      {s:"hero", t:"Yeah. I really do."},
+    ],
+  },
+  perseverance: {
+    label: "perseverance",
+    takeaway: "Trying again — especially when it's hard — is how almost every good thing happens.",
+    foilLabel: "the doubting voice",
+    climaxLines: [
+      {s:"hero", t:"(throwing {prop1} down) I quit. I am DONE. I cannot do this."},
+      {s:"mentor", t:"You can stop. That's allowed. But — may I tell you what I see?"},
+      {s:"hero", t:"(grumpy) Fine."},
+      {s:"mentor", t:"You are SO close. The thing you're trying — most people quit one try before it works."},
+      {s:"hero", t:"(picking {prop1} back up) ... one more try. Just one."},
+      {s:"hero", t:"(after a beat) ... it worked. It actually WORKED!", d:"shocked, then beaming"},
+    ],
+    resolutionLines: [
+      {s:"N", t:"And {hero} learned the secret: most quitting happens right before the magic."},
+      {s:"ALL", t:"One more try!"},
+    ],
+    climaxLines2: [
+      {s:"hero", t:"It's been an HOUR. I can't get this. I'll never get this."},
+      {s:"friend", t:"You said that yesterday. And you're better today than yesterday."},
+      {s:"hero", t:"... am I?"},
+      {s:"friend", t:"You are. I've been watching. The {prop1} barely fell over today."},
+      {s:"hero", t:"({pause}) ... okay. One more. I keep going."},
+      {s:"N", t:"And so they kept going. Smaller and smaller wobbles, until — almost still."},
+    ],
+    resolutionLines2: [
+      {s:"hero", t:"I didn't get it perfect. But I got better. That counts."},
+      {s:"mentor", t:"That's the part that mattered the whole time."},
+    ],
+  },
+  sharing: {
+    label: "sharing",
+    takeaway: "Sharing the thing you love makes the thing — and the day — bigger, not smaller.",
+    foilLabel: "the friend who wants a turn",
+    climaxLines: [
+      {s:"hero", t:"(holding {prop1} close) But it's MINE. I just got it."},
+      {s:"foil", t:"I know. I just wanted... to see it. Even just for a second."},
+      {s:"hero", t:"(pause) ... here. Hold it. Carefully."},
+      {s:"foil", t:"(amazed) Oh. Oh, it's even better up close."},
+      {s:"hero", t:"(small smile) ... it kind of IS better when you're looking at it too."},
+    ],
+    resolutionLines: [
+      {s:"friend", t:"Can I see next?"},
+      {s:"hero", t:"Everyone gets a turn. We'll go in a circle."},
+      {s:"N", t:"And the {prop1}, somehow, felt twice as bright when it was being passed around."},
+    ],
+    climaxLines2: [
+      {s:"foil", t:"You always have the best snacks. And you never share."},
+      {s:"hero", t:"They're MINE. Mom packed them for ME."},
+      {s:"foil", t:"... yeah. Okay. Sorry I asked."},
+      {s:"hero", t:"({pause}, looking at the {prop1}) ... wait. Sit down. Take half."},
+      {s:"foil", t:"Really?"},
+      {s:"hero", t:"Really. Mom made too many anyway. They're better when somebody else is eating one too."},
+    ],
+    resolutionLines2: [
+      {s:"N", t:"And the snacks tasted exactly the same. But the lunch was different."},
+    ],
+  },
+  teamwork: {
+    label: "teamwork",
+    takeaway: "Each of us has one piece. Put the pieces together and you get something none of us could do alone.",
+    foilLabel: "the one who likes to do it alone",
+    climaxLines: [
+      {s:"foil", t:"Fine. FINE. I can't do it by myself. There. I said it."},
+      {s:"hero", t:"You don't have to. {friend}, you climb. {mentor}, you steady the {prop1}. {foil}, you shout when it's straight."},
+      {s:"friend", t:"Got it. Climbing!"},
+      {s:"mentor", t:"Steady, steady..."},
+      {s:"foil", t:"(loud) STRAIGHT! That's straight! THAT'S IT!"},
+      {s:"hero", t:"YES! We did it!"},
+    ],
+    resolutionLines: [
+      {s:"N", t:"And not one of them could have done it alone."},
+      {s:"ALL", t:"Together!"},
+    ],
+    climaxLines2: [
+      {s:"hero", t:"We need a plan. A REAL plan. Not everyone running in different directions."},
+      {s:"friend", t:"Okay. {foil}, what are you good at?"},
+      {s:"foil", t:"(suspicious) ... why?"},
+      {s:"friend", t:"Because we need it. Whatever it is."},
+      {s:"foil", t:"(unsure) ... I'm fast. I guess."},
+      {s:"hero", t:"Then YOU run. {helper}, you watch. {friend}, you and me, we lift. Go."},
+    ],
+    resolutionLines2: [
+      {s:"helper", t:"({smallVoice}) That actually worked."},
+      {s:"foil", t:"(grudgingly impressed) ... yeah. It did."},
+    ],
+  },
+  environment: {
+    label: "caring for the environment",
+    takeaway: "A small kindness to the world we live in adds up — and it usually starts with one person picking one thing up.",
+    foilLabel: "the one who shrugs",
+    climaxLines: [
+      {s:"hero", t:"(picking up {prop1}) Look at this. It doesn't belong here."},
+      {s:"foil", t:"It's just one thing."},
+      {s:"hero", t:"Yeah. And there's another. And another."},
+      {s:"friend", t:"I'll help. Pass me the {prop2}."},
+      {s:"foil", t:"(after a moment) ... fine. Hand me a bag. I'll start over there."},
+    ],
+    resolutionLines: [
+      {s:"N", t:"And by the time the sun set, {settingShort} looked like itself again."},
+      {s:"hero", t:"Same place. Just a little better looked-after."},
+    ],
+    climaxLines2: [
+      {s:"helper", t:"({smallVoice}) The {settingFeature1} used to be brighter. I remember.", d:"sad"},
+      {s:"hero", t:"... it really did."},
+      {s:"foil", t:"What can WE do? We're kids."},
+      {s:"hero", t:"We can do one thing. One small thing. Today."},
+      {s:"friend", t:"Like what?"},
+      {s:"hero", t:"Like — start. Right here. With this {prop1}."},
+    ],
+    resolutionLines2: [
+      {s:"N", t:"They didn't fix the whole {settingShort}. But the part right around them looked a little more like home."},
+    ],
+  },
+  inclusion: {
+    label: "inclusion and belonging",
+    takeaway: "There's always room. Make it on purpose, and the circle gets stronger — not smaller.",
+    foilLabel: "the one left out",
+    climaxLines: [
+      {s:"hero", t:"Wait. {foil} is over there alone. Why aren't they playing?"},
+      {s:"friend", t:"They're new. I don't think they know the game."},
+      {s:"hero", t:"(walking over) Hey. We're playing — it's fun, but a little weird. Want me to teach you?"},
+      {s:"foil", t:"(careful) ... I don't want to slow you down."},
+      {s:"hero", t:"You won't. And honestly — we need a fresh idea. Come on."},
+    ],
+    resolutionLines: [
+      {s:"foil", t:"(later) I had an idea, actually. What if we —"},
+      {s:"hero", t:"YES. Try it. Show us."},
+      {s:"N", t:"And the game got better, because the circle got bigger."},
+    ],
+    climaxLines2: [
+      {s:"foil", t:"(quiet) You don't have to invite me. I'm fine over here."},
+      {s:"hero", t:"You said that an hour ago. You're not fine."},
+      {s:"foil", t:"... no. I'm not."},
+      {s:"hero", t:"Come sit. Right here. There's a spot."},
+      {s:"foil", t:"(after a long pause) ... okay."},
+    ],
+    resolutionLines2: [
+      {s:"friend", t:"What's your name? Like — actually."},
+      {s:"foil", t:"({foil}.)"},
+      {s:"hero", t:"Welcome, {foil}. Real welcome."},
+    ],
+  },
+  responsibility: {
+    label: "responsibility",
+    takeaway: "When you say you'll take care of something, taking care of it — even when no one is looking — is what counts.",
+    foilLabel: "the trust given",
+    climaxLines: [
+      {s:"hero", t:"(quietly) I forgot. I said I would, and I forgot."},
+      {s:"mentor", t:"What are you going to do about it?"},
+      {s:"hero", t:"(starting to fix it) I'm going to make it right. Right now. Even if it's late."},
+      {s:"mentor", t:"That's the part that matters."},
+      {s:"hero", t:"Next time, I'll write it down. I'll set it where I can see it. I won't forget twice."},
+    ],
+    resolutionLines: [
+      {s:"N", t:"And {mentor} let {hero} carry the {prop1} again the next morning. Trust comes back, slowly, when you keep showing up."},
+    ],
+    climaxLines2: [
+      {s:"hero", t:"It was my job. I knew it was my job. I just didn't WANT to do it."},
+      {s:"friend", t:"And?"},
+      {s:"hero", t:"And nobody else can do it but me. So — I'm doing it. Right now."},
+      {s:"foil", t:"(watching) ... want help?"},
+      {s:"hero", t:"No. This one's mine. I'll come find you when it's done."},
+    ],
+    resolutionLines2: [
+      {s:"N", t:"It took longer than it should have. But it got done — by the person who promised."},
+    ],
+  },
+  patience: {
+    label: "patience",
+    takeaway: "Some good things only happen when you wait. Rushing them just means you miss them.",
+    foilLabel: "the rushing voice",
+    climaxLines: [
+      {s:"hero", t:"WHEN will it be ready?! I've been waiting FOREVER."},
+      {s:"mentor", t:"Has it been forever, though?"},
+      {s:"hero", t:"(grumbling) ... twenty minutes."},
+      {s:"mentor", t:"Sit. Watch the {settingFeature1}. Tell me what you see."},
+      {s:"hero", t:"(after a long beat) ... oh. There's a tiny one. And another one. They were here the whole time."},
+      {s:"mentor", t:"You'd have missed them, hurrying."},
+    ],
+    resolutionLines: [
+      {s:"N", t:"And by the time it WAS ready, {hero} had already been given something else, just for waiting."},
+    ],
+    climaxLines2: [
+      {s:"hero", t:"I rushed it. I knew the {prop1} wasn't ready and I rushed it ANYWAY."},
+      {s:"mentor", t:"And what happened?"},
+      {s:"hero", t:"(quiet) ... it broke. Of course it did."},
+      {s:"mentor", t:"Tomorrow it'll be ready. Will you wait this time?"},
+      {s:"hero", t:"({pause}) ... yeah. I'll wait."},
+    ],
+    resolutionLines2: [
+      {s:"N", t:"The next morning came slower than {hero} wanted. That was the whole point."},
+    ],
+  },
+  gratitude: {
+    label: "gratitude",
+    takeaway: "Saying thank you — out loud, on purpose — turns ordinary days into something to remember.",
+    foilLabel: "the one we take for granted",
+    climaxLines: [
+      {s:"hero", t:"(realizing) Oh. {mentor}. You've been doing the {prop1} every morning for me. I never even said —"},
+      {s:"mentor", t:"You don't have to —"},
+      {s:"hero", t:"No. I do. Thank you. I mean it. I see it now."},
+      {s:"mentor", t:"(soft) You're welcome, friend. That's a nicer morning than most."},
+    ],
+    resolutionLines: [
+      {s:"N", t:"And {hero} started looking for things to thank, on purpose. There were more than they expected."},
+      {s:"ALL", t:"Thank you."},
+    ],
+    climaxLines2: [
+      {s:"hero", t:"I was going to complain. About the {prop1}. About all of it."},
+      {s:"friend", t:"And?"},
+      {s:"hero", t:"And then I looked around and — most of this is fine. Most of this is GOOD, actually."},
+      {s:"friend", t:"What changed?"},
+      {s:"hero", t:"I noticed."},
+    ],
+    resolutionLines2: [
+      {s:"N", t:"Some days are hard. Some days are not. {hero} wanted to remember the not-hard ones too."},
+    ],
+  },
+};
+
+// Story shapes: shared opening/middle beats. Lesson supplies climax/resolution.
+const SHAPES = [
+  {
+    id: "lost-thing",
+    titles: ["The Missing {prop1}","Where Is the {prop1}?","The Case of the Lost {prop1}","One {prop1}, Many Pockets"],
+    setup: [
+      {s:"N", t:"{timePhrase} in {settingFull}, where today felt like any other day."},
+      {s:"hero", t:"({greeting}, {settingShort}!) What a {weatherAdj} day to {goalPhrase}.", d:"{warmReact}"},
+      {s:"friend", t:"{hero}! There you are. We've been looking for you."},
+      {s:"hero", t:"You found me. Have you seen my {prop1}? I had it RIGHT here."},
+      {s:"friend", t:"Hmm. Did you check by the {prop2}?"},
+      {s:"hero", t:"Yes. Twice. And by the {settingFeature1}."},
+      {s:"foil", t:"(sighing) Some of us have BIGGER problems than a missing {prop1}.", d:"{worry}"},
+    ],
+    inciting: [
+      {s:"N", t:"{transition} the morning bell rang. The {prop1} was nowhere to be found."},
+      {s:"hero", t:"(panicking, a little) I really, really need it today."},
+      {s:"helper", t:"({smallVoice}) ... I can help look. If you want.", d:"{smallVoice}"},
+      {s:"hero", t:"Yes. Please. Anyone. Everyone."},
+    ],
+    rising: [
+      {s:"friend", t:"Okay. Search teams. {hero} and {helper} take the {settingFeature1}. {foil} and I — wait, {foil}, where are you going?"},
+      {s:"foil", t:"I told you. I have my OWN day. I don't have time for this."},
+      {s:"helper", t:"({smallVoice}) {foil} seemed... not okay this morning. Did anyone say good morning?", d:"thinking"},
+      {s:"hero", t:"({pause}) ... no. We didn't, did we."},
+      {s:"friend", t:"We were all so busy."},
+      {s:"N", t:"And in that small quiet, the search changed shape."},
+    ],
+  },
+  {
+    id: "new-arrival",
+    titles: ["A New Face at {settingShort}","The Stranger and the {prop1}","Welcome, Maybe","One More at the Table"],
+    setup: [
+      {s:"N", t:"{timePhrase} in {settingFull}. The usual crowd, doing the usual things."},
+      {s:"hero", t:"{greeting}! Pass me the {prop1}, {friend}?"},
+      {s:"friend", t:"Here. Same as yesterday. Same as the day before."},
+      {s:"foil", t:"Fine by me. I LIKE same."},
+    ],
+    inciting: [
+      {s:"N", t:"{transition} a stranger {arrivalVerb} into view."},
+      {s:"newcomer", t:"({smallVoice}) Excuse me. Is this — is this the right place?", d:"{worry}"},
+      {s:"foil", t:"Who're YOU?"},
+      {s:"hero", t:"({foil}!) Sorry. Hi. I'm {hero}. This is everyone."},
+      {s:"newcomer", t:"I'm new. I don't know anyone. I just — I heard there was a {prop1} here?"},
+    ],
+    rising: [
+      {s:"friend", t:"There IS. Sort of. We're using it for —"},
+      {s:"foil", t:"For US. We're using it for US."},
+      {s:"newcomer", t:"({pause}) Oh. Sorry. I'll just —", d:"turning to leave"},
+      {s:"hero", t:"Wait."},
+      {s:"helper", t:"({smallVoice}) Don't go yet. Please.", d:"{smallVoice}"},
+      {s:"N", t:"And in that pause, the day decided to be a different kind of day."},
+    ],
+  },
+  {
+    id: "broken-thing",
+    titles: ["The {prop1} That Snapped","One Crack, Two Truths","Something Got Broken","Not on Purpose"],
+    setup: [
+      {s:"N", t:"{timePhrase} in {settingFull}, before anything had gone wrong yet."},
+      {s:"hero", t:"({greeting}!) Watch — I can do it. I've been practicing."},
+      {s:"friend", t:"With the {prop1}? Mentor said to wait until they got back."},
+      {s:"hero", t:"It'll be FINE. I'll be careful."},
+    ],
+    inciting: [
+      {s:"N", t:"{transition} — a small, terrible CRACK."},
+      {s:"hero", t:"({exclaim}) No. NO no no.", d:"{worry}"},
+      {s:"friend", t:"Is it —"},
+      {s:"hero", t:"It's broken. The {prop1} is BROKEN."},
+      {s:"foil", t:"(walking up) What happened? What did you do?"},
+      {s:"hero", t:"(panicking) Nothing. The wind. It was the wind."},
+    ],
+    rising: [
+      {s:"friend", t:"The wind?"},
+      {s:"hero", t:"({pause}) ... yes. The wind. A big one. Just now."},
+      {s:"foil", t:"Hmph. Mentor will figure out who did it. They always do."},
+      {s:"hero", t:"({smallVoice}) Yeah. They always do.", d:"sick to their stomach"},
+      {s:"N", t:"And that small lie sat in {hero}'s chest like a stone, all morning long."},
+    ],
+  },
+  {
+    id: "scary-place",
+    titles: ["Into the {settingFeature1}","One Step Closer","The Shaky Plan","No One Else Can Fit"],
+    setup: [
+      {s:"N", t:"{timePhrase} in {settingFull}. Everything was normal — until it wasn't."},
+      {s:"hero", t:"({greeting}!) Let's race to the {settingFeature2} and back!"},
+      {s:"friend", t:"Race? You're ON. Loser carries the {prop1}!"},
+      {s:"helper", t:"({smallVoice}) Be careful. The {settingFeature1} is —", d:"{worry}"},
+      {s:"hero", t:"We won't go NEAR there. Promise."},
+    ],
+    inciting: [
+      {s:"N", t:"{transition} — a small voice. From inside the {settingFeature1}."},
+      {s:"foil", t:"(off, faint) Help. HELP! I can't get out!"},
+      {s:"hero", t:"({exclaim}) That's {foil}!"},
+      {s:"friend", t:"What were they DOING in there?"},
+      {s:"hero", t:"Doesn't matter. They're stuck."},
+    ],
+    rising: [
+      {s:"friend", t:"I'll go in!"},
+      {s:"helper", t:"({smallVoice}) You can't fit. The opening — it's small. Only {hero} fits.", d:"frightened"},
+      {s:"hero", t:"(staring at {settingFeature1}) ... oh."},
+      {s:"friend", t:"You don't have to."},
+      {s:"hero", t:"({pause}) ... yes. I do."},
+    ],
+  },
+  {
+    id: "task-too-big",
+    titles: ["The Job Too Big for One","Three Hands, One {prop1}","If We Don't All —","The Knot"],
+    setup: [
+      {s:"N", t:"{timePhrase} in {settingFull}. A job had to be done before sundown."},
+      {s:"mentor", t:"The {prop1} has to reach the {settingFeature1} by sundown. Who's helping?"},
+      {s:"hero", t:"I can do it!"},
+      {s:"foil", t:"I work better alone. Don't slow me down."},
+      {s:"friend", t:"I'll help. I just don't know how yet."},
+    ],
+    inciting: [
+      {s:"N", t:"{transition} they tried to lift the {prop1}."},
+      {s:"hero", t:"(straining) It's — it's heavier than it LOOKS —"},
+      {s:"foil", t:"Move. Let me. I've got it. I — oof.", d:"struggling"},
+      {s:"friend", t:"This isn't going to work one-by-one."},
+      {s:"hero", t:"It HAS to. Mentor said by sundown."},
+    ],
+    rising: [
+      {s:"foil", t:"(grumpy) FINE. I will... assist. Briefly."},
+      {s:"helper", t:"({smallVoice}) I can — I can hold the bottom. I'm small but I can hold.", d:"{smallVoice}"},
+      {s:"friend", t:"And I'll guide it. {hero}, you steady from above."},
+      {s:"hero", t:"(amazed) ... that might actually work."},
+      {s:"N", t:"And so they tried, and it almost worked. Almost. The sun kept going down."},
+    ],
+  },
+  {
+    id: "the-secret",
+    titles: ["The Secret in the {prop1}","What {hero} Didn't Tell","One Word Held Back","The Quiet Thing"],
+    setup: [
+      {s:"N", t:"{timePhrase} in {settingFull}. {hero} was holding something close — something nobody else knew."},
+      {s:"hero", t:"({smallVoice}) ... not yet. I'll tell them later.", d:"glancing at {prop1}"},
+      {s:"friend", t:"{hero}? You okay? You've been quiet."},
+      {s:"hero", t:"I'm fine. I'm just — thinking. About... nothing."},
+      {s:"foil", t:"You're TERRIBLE at lying, you know that?"},
+    ],
+    inciting: [
+      {s:"N", t:"{transition} the {prop1} slipped right out of {hero}'s pocket."},
+      {s:"friend", t:"({exclaim}) What's THAT?"},
+      {s:"hero", t:"It's — it's nothing. Give it back."},
+      {s:"foil", t:"That's not nothing. That's the {prop2} that went missing yesterday."},
+      {s:"hero", t:"(panicking) ... I can explain.", d:"{worry}"},
+    ],
+    rising: [
+      {s:"friend", t:"Why didn't you say anything?"},
+      {s:"hero", t:"Because I was scared. I thought you'd be MAD."},
+      {s:"foil", t:"We're not mad you HAVE it. We're confused you HID it."},
+      {s:"helper", t:"({smallVoice}) Sometimes hiding makes the small thing bigger.", d:"thoughtful"},
+      {s:"hero", t:"({pause}) ... yeah. Yeah, it does."},
+    ],
+  },
+  {
+    id: "underdog-contest",
+    titles: ["The {settingShort} Contest","One Long Shot","The Smallest Entry","Last Place to First"],
+    setup: [
+      {s:"N", t:"{timePhrase} in {settingFull}. Today was the contest. Everyone had practiced for weeks."},
+      {s:"foil", t:"I've been training. I'm winning this. Don't even try."},
+      {s:"hero", t:"I just want to FINISH. Not even win. Just finish without falling over."},
+      {s:"friend", t:"You're going to do great. You really are."},
+      {s:"helper", t:"({smallVoice}) Did anyone bring the {prop1}? I think we need it.", d:"{smallVoice}"},
+    ],
+    inciting: [
+      {s:"N", t:"{transition} the contest began. And right away, something went wrong."},
+      {s:"foil", t:"({exclaim}) MY {prop1}! It's BROKEN!"},
+      {s:"hero", t:"What happened?"},
+      {s:"foil", t:"I don't KNOW. It just — snapped."},
+      {s:"friend", t:"You can't compete without it."},
+    ],
+    rising: [
+      {s:"foil", t:"(furious) Someone did this on PURPOSE."},
+      {s:"hero", t:"Nobody did this on purpose. Look — you can use mine. Take it."},
+      {s:"foil", t:"Then YOU can't compete."},
+      {s:"hero", t:"({pause}) ... I know."},
+      {s:"helper", t:"({smallVoice}) That's a really nice thing.", d:"watching"},
+      {s:"foil", t:"(uncomfortable) Why are you helping me. After everything I said."},
+    ],
+  },
+  {
+    id: "promise-tested",
+    titles: ["The Promise","Cross My Heart","What {hero} Said","Words and Then"],
+    setup: [
+      {s:"N", t:"{timePhrase} in {settingFull}. Yesterday {hero} had made a promise."},
+      {s:"mentor", t:"You'll watch the {prop1} while I'm gone? You're sure?"},
+      {s:"hero", t:"{promise} Don't worry."},
+      {s:"mentor", t:"Good. I'll be back by sundown."},
+      {s:"friend", t:"That's a big job."},
+      {s:"hero", t:"I can handle it. Easy."},
+    ],
+    inciting: [
+      {s:"N", t:"{transition} {foil} arrived with an idea."},
+      {s:"foil", t:"Hey. Come with us to the {settingFeature1}. We're doing something fun."},
+      {s:"hero", t:"I can't. I'm watching the {prop1}."},
+      {s:"foil", t:"It's just for ten minutes. The {prop1} won't even notice."},
+      {s:"hero", t:"(tempted) ... it IS just ten minutes.", d:"{worry}"},
+    ],
+    rising: [
+      {s:"friend", t:"{hero}, you said you'd stay."},
+      {s:"foil", t:"It's FINE. Come ON. Don't be the boring one."},
+      {s:"hero", t:"({pause}) ... I'll come for ten. JUST ten."},
+      {s:"N", t:"Ten minutes turned into thirty. The {prop1} sat alone."},
+      {s:"helper", t:"({smallVoice}) Um. We should probably get back.", d:"{worry}"},
+    ],
+  },
+];
+
+// Optional rhyme/song lines — appended near climax if state.songs
+const SONGS = [
+  ["Step by step, and slow by slow,","one good choice — that's how things grow.","Quiet starts and small kind hands,","that's the way the kindness lands."],
+  ["Take a breath. Stand up tall.","Big or scared or shy or small —","everyone has something to bring.","Together's how we do the thing."],
+  ["When the day feels far too long,","find a hand and sing this song:","'I am here, and you are too,","all of us, together — through.'"],
+];
+
+// Twists for "spicy" random tier
+const TWISTS = [
+  "(unexpected helper) An animal no one noticed has been quietly fixing things in the background.",
+  "(reversal) The character everyone expected to refuse is the first to step forward.",
+  "(small magic) The {prop1} does one tiny, unexplained thing — a glimmer, a chime, a glow.",
+  "(found note) A note tucked in the {prop2} explains exactly what to do.",
+  "(forgotten promise) Someone remembers something they promised long ago, and it changes the moment.",
+  "(small audience) A tiny child has been watching the whole time and now wants to know what happens next.",
+  "(weather turns) The wind shifts, and with it, the day.",
+  "(echo) The {settingFeature1} answers back — once, just clearly enough to be heard.",
+  "(thing that wasn't lost) The {prop1} was never missing — it was right where someone left it on purpose.",
+];
+
+// Conflict-aware insertion — extra rising-action lines based on conflict type
+const CONFLICT_BEATS = {
+  "vs-self": [
+    {s:"hero", t:"(to themselves) I keep telling myself I'll do it later. But later isn't coming.", d:"alone for a moment"},
+  ],
+  "vs-other": [
+    {s:"foil", t:"You think you're better than me? Is that it?"},
+    {s:"hero", t:"That's not what I said. That's not what I MEANT.", d:"{worry}"},
+  ],
+  "vs-nature": [
+    {s:"N", t:"And then the wind picked up. The {settingFeature1} shifted. Everything got a little harder."},
+    {s:"hero", t:"({exclaim}) The weather's turning. We don't have much time."},
+  ],
+  "vs-group": [
+    {s:"foil", t:"Everyone agrees. Everyone but YOU."},
+    {s:"hero", t:"({pause}) ... that doesn't make me wrong, though."},
+    {s:"friend", t:"It doesn't make you right either."},
+  ],
+};
+
+/* ============================================================
+   ENGINE
+   ============================================================ */
+
+// Resolve {key} from a context object. Supports things like {hero}, {prop1}, {settingFeature1}, {greeting}.
+function fill(template, ctx) {
+  if (!template) return "";
+  return template.replace(/\{([a-zA-Z0-9_.]+)\}/g, (_, key) => {
+    // dotted access: hero.species etc — we keep flat for now
+    if (ctx.chars[key]) return ctx.chars[key].name;
+    if (ctx.props[key] !== undefined) return ctx.props[key];
+    if (key === "settingShort") return ctx.setting.short;
+    if (key === "settingFull") return ctx.setting.full;
+    if (key.startsWith("settingFeature")) {
+      const idx = parseInt(key.replace("settingFeature","")) || 1;
+      return ctx.setting.features[(idx - 1) % ctx.setting.features.length];
+    }
+    // tone-overridden variant pools
+    const toneV = TONES[ctx.state.tone] || {};
+    const pool = toneV[key] || V[key];
+    if (pool && Array.isArray(pool)) return pick(pool);
+    return "{" + key + "}";
+  });
+}
+
+// Resolve speaker code (hero/foil/...) to actual character name
+function resolveSpeaker(code, ctx) {
+  if (code === "N" || code === "NARRATOR") return "NARRATOR";
+  if (code === "ALL") return "ALL";
+  if (ctx.chars[code]) return ctx.chars[code].name;
+  // helper might not exist for tiny casts -> fall back to friend
+  if (code === "helper" && ctx.chars.friend) return ctx.chars.friend.name;
+  if (code === "mentor" && ctx.chars.friend) return ctx.chars.friend.name;
+  if (code === "newcomer" && ctx.chars.foil) return ctx.chars.foil.name;
+  return ctx.chars.hero ? ctx.chars.hero.name : "?";
+}
+
+function expandBeat(beat, ctx, opts = {}) {
+  const out = [];
+  for (const ln of beat) {
+    const speaker = resolveSpeaker(ln.s, ctx);
+    if (speaker === "NARRATOR" && ctx.state.narrator === "off") continue;
+    if (speaker === "?") continue;
+    const text = fill(ln.t, ctx).trim();
+    const direction = ln.d ? fill(ln.d, ctx) : undefined;
+    out.push({ speaker, text, direction });
+  }
+  // Adjust narrator density
+  if (ctx.state.narrator === "prominent" && opts.allowExtraNarrator !== false) {
+    // ok, leave as-is
+  } else if (ctx.state.narrator === "light") {
+    // drop some narrator lines past the first per beat
+    let seenN = 0;
+    return out.filter(l => {
+      if (l.speaker === "NARRATOR") { seenN++; return seenN <= 1; }
+      return true;
+    });
+  }
+  return out;
+}
+
+// Adjust line text for grade band (K-2 = simpler/shorter)
+function simplifyForGrade(lines, gradeBand) {
+  if (gradeBand !== "K-2") return lines;
+  return lines.map(l => ({
+    ...l,
+    text: l.text
+      .replace(/\bperfectly\s+ordinary\b/gi, "regular")
+      .replace(/\bnonetheless\b/gi, "still")
+      .replace(/\bobservation\b/gi, "thing I noticed")
+      .replace(/—/g, ".")
+      // shorten very long sentences crudely
+      .split(". ").slice(0, 3).join(". "),
+  }));
+}
+
+function assembleCharacters(state) {
+  const setting = SETTINGS[matchSettingKey(state.setting)] || SETTINGS["enchanted forest"];
+  const speciesPool = setting.speciesPool.slice();
+  const userChars = state.characters.filter(c => (c.name || "").trim() || (c.hint || "").trim());
+  const usedNames = new Set();
+  const makeChar = (role, override) => {
+    let name, description;
+    if (override) {
+      name = override.name && override.name.trim() ? override.name.trim() : pick(NAMES.filter(n => !usedNames.has(n)));
+      description = override.hint && override.hint.trim() ? override.hint.trim() : `the ${pick(speciesPool)} (${roleHint(role)})`;
+    } else {
+      name = pick(NAMES.filter(n => !usedNames.has(n)));
+      const sp = speciesPool.length ? speciesPool.splice(Math.floor(rng() * speciesPool.length), 1)[0] : "friend";
+      description = `the ${sp} — ${roleHint(role)}`;
+    }
+    usedNames.add(name);
+    return { role, name, description };
+  };
+  const roles = ["hero","foil","friend","mentor","helper","newcomer"];
+  const chars = {};
+  // Map user characters to roles in order
+  userChars.slice(0, roles.length).forEach((uc, i) => {
+    chars[roles[i]] = makeChar(roles[i], uc);
+  });
+  // Required: hero
+  if (!chars.hero) chars.hero = makeChar("hero");
+  // Fill foil/friend at minimum
+  if (!chars.foil) chars.foil = makeChar("foil");
+  if (state.castSize >= 3 && !chars.friend) chars.friend = makeChar("friend");
+  if (state.castSize >= 4 && !chars.mentor) chars.mentor = makeChar("mentor");
+  if (state.castSize >= 5 && !chars.helper) chars.helper = makeChar("helper");
+  if (state.castSize >= 6 && !chars.newcomer) chars.newcomer = makeChar("newcomer");
+  // Extras for very large casts
+  let extraCount = Math.max(0, state.castSize - Object.keys(chars).length);
+  let ei = 1;
+  while (extraCount > 0) {
+    chars["extra" + ei] = makeChar("extra" + ei);
+    ei++; extraCount--;
+  }
+  return { chars, setting };
+}
+function roleHint(role) {
+  return ({
+    hero: "earnest, our main character",
+    foil: "stubborn at first, comes around",
+    friend: "loyal and warm",
+    mentor: "patient, has been through it",
+    helper: "small, careful, easily missed",
+    newcomer: "the new face",
+  })[role] || "supporting role";
+}
+function matchSettingKey(text) {
+  if (!text) return "enchanted forest";
+  const t = text.toLowerCase();
+  for (const k of Object.keys(SETTINGS)) {
+    if (t.includes(k.toLowerCase()) || k.toLowerCase().includes(t)) return k;
+  }
+  return null;
+}
+
+function assembleProps(state, setting) {
+  const userProps = state.props.filter(p => (p || "").trim()).map(p => p.trim());
+  const want = Math.max(3, Math.min(6, userProps.length + 3));
+  const pool = setting.typicalProps.filter(p => !userProps.includes(p));
+  const filled = userProps.concat(pickN(pool, want - userProps.length));
+  // expose by index AND key
+  const byKey = {};
+  filled.forEach((p, i) => byKey["prop" + (i + 1)] = p);
+  return { list: filled, byKey };
+}
+
+function pickShape(state) {
+  // Prefer shapes that fit lessons
+  const fits = {
+    kindness: ["lost-thing","new-arrival","the-secret"],
+    honesty: ["broken-thing","the-secret","promise-tested"],
+    courage: ["scary-place","underdog-contest"],
+    friendship: ["new-arrival","promise-tested","the-secret"],
+    perseverance: ["task-too-big","underdog-contest"],
+    sharing: ["new-arrival","lost-thing","underdog-contest"],
+    teamwork: ["task-too-big","underdog-contest"],
+    environment: ["lost-thing","task-too-big"],
+    inclusion: ["new-arrival","underdog-contest"],
+    responsibility: ["broken-thing","promise-tested"],
+    patience: ["task-too-big","promise-tested"],
+    gratitude: ["lost-thing","new-arrival","the-secret"],
+  }[state.lesson] || [];
+  const pool = SHAPES.filter(s => fits.includes(s.id));
+  if (pool.length) return pick(pool);
+  return pick(SHAPES);
+}
+
+function applyTwist(lines, ctx) {
+  if (ctx.state.random === "none") return lines;
+  if (ctx.state.random === "spicy") {
+    const t = pick(TWISTS);
+    const direction = fill(t, ctx);
+    // attach as opening direction marker on first line of climax (caller can use)
+    return [{ speaker: "NARRATOR", text: "(twist) " + direction, direction: undefined }, ...lines];
+  }
+  if (ctx.state.random === "wild") {
+    // wild: also add a mash-up note before the climax
+    return [{ speaker: "NARRATOR", text: "(suddenly, in a way no one expected, the world tilts a little — and a wild detail enters the scene)", direction: undefined }, ...lines];
+  }
+  return lines;
+}
+
+function buildArc(ctx) {
+  const shape = ctx.shape;
+  const lesson = LESSONS[ctx.state.lesson];
+  let lines = [];
+  lines = lines.concat(expandBeat(shape.setup, ctx));
+  lines = lines.concat(expandBeat(shape.inciting, ctx));
+  lines = lines.concat(expandBeat(shape.rising, ctx));
+  // Conflict-aware injection — adds 1-3 lines tinted to the conflict type
+  const cb = CONFLICT_BEATS[ctx.state.conflict];
+  if (cb) lines = lines.concat(expandBeat(cb, ctx));
+  // Optional song just before climax
+  if (ctx.state.songs) {
+    const verses = pick(SONGS);
+    const speaker = ctx.chars.helper?.name || ctx.chars.friend?.name || ctx.chars.hero.name;
+    verses.forEach((v, i) => lines.push({ speaker: i === 0 ? speaker : "ALL", text: v }));
+  }
+  // Pick which lesson variant to use (1 or 2 if available)
+  const useVar2 = lesson.climaxLines2 && chance(0.5);
+  const climaxBeat = useVar2 ? lesson.climaxLines2 : lesson.climaxLines;
+  const resBeat = useVar2 ? (lesson.resolutionLines2 || lesson.resolutionLines) : lesson.resolutionLines;
+  let climax = expandBeat(climaxBeat, ctx);
+  climax = applyTwist(climax, ctx);
+  lines = lines.concat(climax);
+  lines = lines.concat(expandBeat(resBeat, ctx));
+
+  // Closing tag
+  lines.push({ speaker: "NARRATOR", text: fill(pick(V.resolveClose), ctx) });
+
+  return simplifyForGrade(lines, ctx.state.gradeBand);
+}
+
+function chunkIntoActs(lines, length) {
+  // Try to chunk by content markers
+  const total = lines.length;
+  if (length === "short") {
+    return [{
+      number: 1, title: "",
+      scenes: [{
+        number: 1,
+        location: lines._location || "",
+        openingDirection: lines._opening || "",
+        lines,
+      }]
+    }];
+  }
+  if (length === "medium") {
+    const half = Math.ceil(total * 0.45);
+    const a = lines.slice(0, half);
+    const b = lines.slice(half);
+    return [
+      { number: 1, title: "Setup", scenes: [{ number: 1, location: "", openingDirection: "", lines: a }] },
+      { number: 2, title: "Choice & After", scenes: [{ number: 1, location: "", openingDirection: "", lines: b }] },
+    ];
+  }
+  // long: 3 acts
+  const a1 = Math.ceil(total * 0.32);
+  const a2 = Math.ceil(total * 0.65);
+  return [
+    { number: 1, title: "The Day Begins", scenes: [{ number: 1, location: "", openingDirection: "", lines: lines.slice(0, a1) }] },
+    { number: 2, title: "Trouble", scenes: [{ number: 1, location: "", openingDirection: "", lines: lines.slice(a1, a2) }] },
+    { number: 3, title: "Choice & After", scenes: [{ number: 1, location: "", openingDirection: "", lines: lines.slice(a2) }] },
+  ];
+}
+
+function makeTitle(ctx) {
+  // Pool: shape-specific titles + global title patterns
+  const pool = [...ctx.shape.titles, ...GLOBAL_TITLES];
+  // Try a few times to avoid awkward unfilled slots (some patterns reference foil etc.)
+  for (let i = 0; i < 5; i++) {
+    const t = fill(pick(pool), ctx);
+    if (!t.includes('{')) return t;
+  }
+  // Fallback: shape title only
+  return fill(pick(ctx.shape.titles), ctx);
+}
+function makeLogline(ctx) {
+  const lesson = LESSONS[ctx.state.lesson];
+  const hero = ctx.chars.hero.name;
+  const foil = ctx.chars.foil ? ctx.chars.foil.name : 'an unlikely partner';
+  const setting = ctx.setting.short;
+  const prop1 = ctx.props.prop1 || 'something small';
+  const templates = [
+    `In ${setting}, ${hero} learns about ${lesson.label} the hard way — and the right way, just in time.`,
+    `One ordinary day in ${setting} turns into a small, important lesson about ${lesson.label}.`,
+    `A ${ctx.state.tone} tale about ${lesson.label}, set in ${setting}, with a cast that has to figure it out together.`,
+    `When ${prop1} goes missing in ${setting}, ${hero} discovers what really matters.`,
+    `${hero} thought today would be ordinary. ${setting} had other plans.`,
+    `Sometimes the smallest moment — a ${prop1}, a quiet word — changes everything.`,
+    `${hero} and ${foil} don't see eye to eye. By sundown in ${setting}, that might change.`,
+    `A short play about ${lesson.label}, where the hardest thing and the right thing turn out to be the same thing.`,
+    `A story about a ${prop1}, ${setting}, and the choice that made it all worthwhile.`,
+    `Some lessons live in big speeches. This one lives in a single, small choice.`,
+    `A play in which a ${prop1}, ${setting}, and one quiet moment add up to more than they seem.`,
+    `${hero} has a problem. ${foil} has the wrong answer. ${setting} is about to teach them both.`,
+  ];
+  return pick(templates);
+}
+
+function buildPlay(state) {
+  const seedToUse = state.seed || String(Math.floor(Math.random() * 1e9));
+  rng = makeRng(seedToUse);
+  state.seed = seedToUse;
+  document.getElementById('seed').value = seedToUse;
+
+  const { chars, setting } = assembleCharacters(state);
+  const props = assembleProps(state, setting);
+  const ctx = {
+    state, chars, setting, props: props.byKey,
+    shape: pickShape(state),
+  };
+  const lines = buildArc(ctx);
+
+  const charactersOut = Object.values(chars).map(c => ({ name: c.name, description: c.description }));
+
+  const acts = chunkIntoActs(lines, state.length);
+  // Assign scene-specific location and opening direction
+  // Each scene picks a different setting feature and a stage tone matching its position in the arc
+  let sceneIndex = 0;
+  const totalScenes = acts.reduce((n, a) => n + a.scenes.length, 0);
+  acts.forEach((act, ai) => {
+    act.scenes.forEach((sc, si) => {
+      const feature = setting.features[sceneIndex % setting.features.length];
+      const where = `${setting.full}, near ${feature}`;
+      sc.location = where;
+      // pick stage tone by progression
+      const pos = sceneIndex / Math.max(1, totalScenes - 1); // 0..1
+      let toneKey = 'bright';
+      if (pos < 0.25) toneKey = 'bright';
+      else if (pos < 0.55) toneKey = 'later';
+      else if (pos < 0.85) toneKey = 'tense';
+      else toneKey = 'warm';
+      const ctx2 = { ...{ chars, setting, props: props.byKey, state }, };
+      const od = pick(SCENE_OPENINGS[toneKey]);
+      sc.openingDirection = fill(od, ctx2);
+      sceneIndex++;
+    });
+  });
+
+  const lengthMin = { short: 5, medium: 12, long: 22 }[state.length];
+
+  return {
+    title: makeTitle(ctx),
+    logline: makeLogline(ctx),
+    lessonTakeaway: LESSONS[state.lesson].takeaway,
+    estimatedRunTimeMin: lengthMin,
+    setting: setting.full,
+    characters: charactersOut,
+    props: props.list,
+    acts,
+  };
+}
+
+/* ============================================================
+   UI WIRING
+   ============================================================ */
+function wireChips() {
+  document.querySelectorAll('[data-chips]').forEach(group => {
+    const key = group.dataset.chips;
+    group.addEventListener('click', e => {
+      const btn = e.target.closest('.chip'); if (!btn) return;
+      group.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed','false'));
+      btn.setAttribute('aria-pressed','true');
+      state[key] = btn.dataset.val;
+    });
+  });
+  document.getElementById('settingChips').addEventListener('click', e => {
+    const btn = e.target.closest('.chip'); if (!btn) return;
+    document.getElementById('setting').value = btn.dataset.val;
+    state.setting = btn.dataset.val;
+  });
+  document.getElementById('lockRow').addEventListener('click', e => {
+    const btn = e.target.closest('.lock'); if (!btn) return;
+    const key = btn.dataset.lock;
+    state.locks[key] = !state.locks[key];
+    btn.setAttribute('aria-pressed', state.locks[key] ? 'true' : 'false');
+  });
+}
+
+function wireForm() {
+  const $ = id => document.getElementById(id);
+  $('castSize').addEventListener('input', e => state.castSize = +e.target.value || 5);
+  $('balance').addEventListener('change', e => state.balance = e.target.value);
+  $('lesson').addEventListener('change', e => state.lesson = e.target.value);
+  $('setting').addEventListener('input', e => state.setting = e.target.value);
+  $('narrator').addEventListener('change', e => state.narrator = e.target.value);
+  $('directions').addEventListener('change', e => state.directions = e.target.value);
+  $('songs').addEventListener('change', e => state.songs = e.target.checked);
+  $('seed').addEventListener('input', e => state.seed = e.target.value);
+  $('randSeed').addEventListener('click', () => {
+    const s = String(Math.floor(Math.random() * 1e9));
+    state.seed = s; $('seed').value = s;
+  });
+
+  $('addCharacter').addEventListener('click', () => { state.characters.push({name:"", hint:""}); renderCharacterList(); });
+  $('addProp').addEventListener('click', () => { state.props.push(""); renderPropList(); });
+
+  $('generate').addEventListener('click', generate);
+  $('surpriseMe').addEventListener('click', surpriseMe);
+  $('newPlay').addEventListener('click', newPlay);
+  $('printBtn').addEventListener('click', () => window.print());
+  $('pdfBtn').addEventListener('click', () => {
+    if (!state.play) return;
+    setStatus('Use "Save as PDF" in the dialog →', 'success');
+    setTimeout(() => window.print(), 50);
+  });
+  $('copyTxt').addEventListener('click', copyText);
+  $('downloadTxt').addEventListener('click', downloadText);
+  $('saveLib').addEventListener('click', saveToLibrary);
+
+}
+
+function renderCharacterList() {
+  const root = document.getElementById('characterList');
+  root.innerHTML = '';
+  state.characters.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.innerHTML = `
+      <input type="text" placeholder="Name" value="${esc(c.name)}" />
+      <input type="text" placeholder="Hint (e.g., shy turtle)" value="${esc(c.hint)}" />
+      <button class="del" title="Remove">&times;</button>`;
+    const [n, h, d] = row.children;
+    n.addEventListener('input', e => state.characters[i].name = e.target.value);
+    h.addEventListener('input', e => state.characters[i].hint = e.target.value);
+    d.addEventListener('click', () => { state.characters.splice(i,1); renderCharacterList(); });
+    root.appendChild(row);
+  });
+}
+function renderPropList() {
+  const root = document.getElementById('propList');
+  root.innerHTML = '';
+  state.props.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'item simple';
+    row.innerHTML = `<input type="text" placeholder="Prop" value="${esc(p)}" />
+                     <button class="del">&times;</button>`;
+    const [v, d] = row.children;
+    v.addEventListener('input', e => state.props[i] = e.target.value);
+    d.addEventListener('click', () => { state.props.splice(i,1); renderPropList(); });
+    root.appendChild(row);
+  });
+}
+
+/* ============================================================
+   GENERATION (offline, deterministic given seed)
+   ============================================================ */
+function setStatus(msg, kind = '') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = kind;
+}
+
+function generate() {
+  try {
+    setStatus('Generating…');
+    if (state.play) {
+      if (state.locks.characters) state.characters = state.play.characters.map(c => ({ name: c.name, hint: c.description }));
+      if (state.locks.props) state.props = state.play.props.slice();
+      if (state.locks.setting) state.setting = state.play.setting;
+    }
+    // Always reroll: clear seed to force a fresh one (use the field only via dedicated jump-to-seed flow if needed)
+    state.seed = String(Math.floor(Math.random() * 1e9));
+    document.getElementById('seed').value = state.seed;
+    state.play = buildPlay(state);
+    renderPlay();
+    document.body.classList.add('has-play');
+    setStatus('Done.', 'success');
+  } catch (e) {
+    console.error(e);
+    setStatus(e.message || 'Error', 'error');
+  }
+}
+
+function regenerateScene(actIdx, sceneIdx) {
+  // Re-run engine with same state, replace just that scene's lines
+  try {
+    setStatus(`Rewriting Act ${actIdx + 1}, Scene ${sceneIdx + 1}…`);
+    // Keep locks effectively on — same chars/props/setting
+    const keepChars = state.play.characters;
+    const keepProps = state.play.props;
+    const keepSetting = state.play.setting;
+    // Bump seed for variation
+    state.seed = String(Math.floor(Math.random() * 1e9));
+    document.getElementById('seed').value = state.seed;
+    rng = makeRng(state.seed);
+
+    // Build a fresh ctx using the existing chars/props/setting
+    const settingKey = matchSettingKey(keepSetting) || "enchanted forest";
+    const setting = SETTINGS[settingKey];
+    // Recreate chars in the role mapping order they currently are
+    const roleOrder = ["hero","foil","friend","mentor","helper","newcomer"];
+    const chars = {};
+    keepChars.slice(0, roleOrder.length).forEach((c, i) => {
+      chars[roleOrder[i]] = { role: roleOrder[i], name: c.name, description: c.description };
+    });
+    const props = {};
+    keepProps.forEach((p, i) => props["prop" + (i + 1)] = p);
+
+    const ctx = { state, chars, setting, props, shape: pickShape(state) };
+    const fresh = buildArc(ctx);
+    const acts = chunkIntoActs(fresh, state.length);
+    const newScene = acts[actIdx]?.scenes[sceneIdx];
+    if (!newScene) { setStatus('Could not rewrite that scene.', 'error'); return; }
+    state.play.acts[actIdx].scenes[sceneIdx].lines = newScene.lines;
+    renderPlay();
+    setStatus('Scene rewritten.', 'success');
+  } catch (e) {
+    console.error(e); setStatus(e.message, 'error');
+  }
+}
+
+/* ============================================================
+   RENDERING (unchanged from v1)
+   ============================================================ */
+function esc(s = "") { return String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+
+function lineCountByCharacter() {
+  const counts = {};
+  state.play.acts.forEach(a => a.scenes.forEach(s => s.lines.forEach(l => {
+    counts[l.speaker] = (counts[l.speaker] || 0) + 1;
+  })));
+  return counts;
+}
+
+// Stable color per character (by index)
+const CHAR_COLORS = ["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--c6)","var(--c7)","var(--c8)"];
+function colorForSpeaker(name, p) {
+  if (!name) return null;
+  const upper = name.toUpperCase();
+  if (upper === "NARRATOR") return "var(--cN)";
+  if (upper === "ALL") return "var(--accent2)";
+  const idx = p.characters.findIndex(c => c.name === name);
+  if (idx < 0) return null;
+  return CHAR_COLORS[idx % CHAR_COLORS.length];
+}
+function initialOf(name) {
+  const t = (name || "?").trim();
+  return t ? t[0].toUpperCase() : "?";
+}
+function ordinal(n) {
+  return ["One","Two","Three","Four","Five","Six","Seven","Eight"][n - 1] || String(n);
+}
+function gradeLabel(b) { return b === "K-2" ? "Grades K–2" : "Grades 3–5"; }
+function lessonLabelFromKey(key) {
+  return ({
+    kindness:"Kindness", honesty:"Honesty", courage:"Courage", friendship:"Friendship",
+    perseverance:"Perseverance", sharing:"Sharing", teamwork:"Teamwork",
+    environment:"Caring for the Environment", inclusion:"Inclusion & Belonging",
+    responsibility:"Responsibility", patience:"Patience", gratitude:"Gratitude",
+  })[key] || key;
+}
+
+// Render helpers (used both for measurement and final render)
+function renderSceneHeaderHtml(sc, ai, si) {
+  return `<div class="scene-block">
+    <div class="scene-h"><span>Scene ${sc.number}</span><button class="iconbtn" data-rescene="${ai}-${si}">↻ Rewrite scene</button></div>
+    <div class="scene-loc editable" data-bind-loc="${ai}-${si}">${esc(sc.location)}</div>
+    ${sc.openingDirection ? `<div class="scene-od editable" data-bind-od="${ai}-${si}">(${esc(sc.openingDirection)})</div>` : ''}
+  </div>`;
+}
+function renderActHeaderHtml(act) {
+  return `<div class="act-block"><h2 class="act-h"><span class="num">Act ${ordinal(act.number)}</span>${act.title ? esc(act.title) : ''}</h2></div>`;
+}
+function renderLineHtmlForItem(item, p, allSpeakers) {
+  const { ai, si, li, line: ln } = item;
+  const upper = (ln.speaker || '').toUpperCase();
+  const isNarrator = upper === 'NARRATOR';
+  const isAll = upper === 'ALL';
+  const color = colorForSpeaker(ln.speaker, p);
+  const cls = ['line'];
+  if (isNarrator) cls.push('narrator');
+  if (isAll) cls.push('all');
+  const styleAttr = color ? ` style="--ch: ${color};"` : '';
+  const speakerOptions = allSpeakers.map(s => `<option ${s === ln.speaker ? 'selected' : ''}>${esc(s)}</option>`).join('');
+  return `<div class="${cls.join(' ')}" data-speaker="${esc(ln.speaker)}"${styleAttr}>
+    <div class="speaker"><select data-bind-speaker="${ai}-${si}-${li}">${speakerOptions}</select></div>
+    <div>
+      <div class="text editable" data-bind-text="${ai}-${si}-${li}">${esc(ln.text)}</div>
+      ${ln.direction ? `<span class="direction editable" data-bind-dir="${ai}-${si}-${li}">(${esc(ln.direction)})</span>` : ''}
+    </div>
+  </div>`;
+}
+
+// Measure-based pagination. Each script "page" is an array of items.
+function paginateScriptByMeasure(p) {
+  const allSpeakers = [...p.characters.map(c => c.name), "NARRATOR", "ALL"];
+
+  // Items in order
+  const items = [];
+  p.acts.forEach((act, ai) => {
+    act.scenes.forEach((sc, si) => {
+      items.push({ kind: 'sceneStart', ai, si, isFirstSceneOfAct: si === 0 });
+      sc.lines.forEach((ln, li) => items.push({ kind: 'line', ai, si, li, line: ln }));
+    });
+  });
+
+  // Determine target page dimensions: copy from current CSS using a temp page-paper
+  const probe = document.createElement('article');
+  probe.className = 'page-paper';
+  probe.style.cssText = 'position:fixed; left:-99999px; top:0; visibility:hidden; display:flex; flex-direction:column;';
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const pageW = parseFloat(cs.width) || 600;
+  const pageH = parseFloat(cs.height) || 800;
+  const padTop = parseFloat(cs.paddingTop) || 48;
+  const padBottom = parseFloat(cs.paddingBottom) || 56;
+  const padLeft = parseFloat(cs.paddingLeft) || 64;
+  const padRight = parseFloat(cs.paddingRight) || 64;
+  document.body.removeChild(probe);
+
+  const innerH = pageH - padTop - padBottom;
+
+  // Measurer that mirrors the page's content area (override aspect-ratio so it grows with content)
+  const m = document.createElement('article');
+  m.className = 'page-paper measurer';
+  m.style.cssText = `position:fixed; left:-99999px; top:0; width:${pageW}px; min-height:0; height:auto; aspect-ratio:auto; max-height:none; padding:${padTop}px ${padRight}px ${padBottom}px ${padLeft}px; box-sizing:border-box; visibility:hidden; display:flex; flex-direction:column; overflow:visible;`;
+  document.body.appendChild(m);
+
+  const renderItems = (items) => {
+    let html = `<div class="page-running">${esc(p.title)}</div><div class="page-running right">Act</div>`;
+    items.forEach(item => {
+      if (item.kind === 'sceneStart') {
+        if (item.isFirstSceneOfAct) html += renderActHeaderHtml(p.acts[item.ai]);
+        html += renderSceneHeaderHtml(p.acts[item.ai].scenes[item.si], item.ai, item.si);
+      } else if (item.kind === 'line') {
+        html += renderLineHtmlForItem(item, p, allSpeakers);
+      }
+    });
+    return html;
+  };
+
+  const overflows = () => m.scrollHeight > pageH - 8; // small safety margin
+
+  const pages = [];
+  let chunk = [];
+  for (const item of items) {
+    chunk.push(item);
+    m.innerHTML = renderItems(chunk);
+    if (overflows()) {
+      // Pop item, save page, restart with item
+      chunk.pop();
+      if (chunk.length === 0) {
+        pages.push([item]);
+        chunk = [];
+      } else {
+        pages.push(chunk);
+        // Re-attach the popped item; if it's a line and we're moving to next page,
+        // ensure the next page repeats the scene header so the reader has context.
+        const popped = item;
+        chunk = [];
+        if (popped.kind === 'line') {
+          // Find the most recent scene-start for this line
+          const scStart = { kind: 'sceneStart', ai: popped.ai, si: popped.si, isFirstSceneOfAct: false, isContinuation: true };
+          chunk.push(scStart);
+        }
+        chunk.push(popped);
+      }
+    }
+  }
+  if (chunk.length) pages.push(chunk);
+
+  document.body.removeChild(m);
+  return pages;
+}
+
+function buildPages(p) {
+  const pages = [];
+  pages.push({ kind: 'cover', label: 'Title Page' });
+  pages.push({ kind: 'front', label: 'Front Matter — Cast & Notes' });
+
+  const scriptPages = paginateScriptByMeasure(p);
+  let lastActNum = null;
+  scriptPages.forEach((chunk) => {
+    const firstWithAct = chunk.find(x => x.ai !== undefined);
+    const actNum = firstWithAct ? p.acts[firstWithAct.ai].number : 1;
+    const cont = actNum === lastActNum;
+    pages.push({
+      kind: 'script', actNum, items: chunk,
+      label: `Act ${ordinal(actNum).toUpperCase()}${cont ? ' (cont.)' : ''}`,
+    });
+    lastActNum = actNum;
+  });
+
+  pages.forEach((pg, i) => pg.num = i + 1);
+  return pages;
+}
+
+function renderPlay() {
+  const out = document.getElementById('output');
+  const p = state.play;
+  if (!p) { out.innerHTML = ''; return; }
+  document.getElementById('docTitle').textContent = p.title;
+
+  const counts = lineCountByCharacter();
+  const charNames = p.characters.map(c => c.name);
+  const allSpeakers = [...charNames, "NARRATOR", "ALL"];
+
+  const prevReh = (window._lastRehChar || '');
+  const eyebrow = `A Children's Play · ${gradeLabel(state.gradeBand)} · Lesson: ${lessonLabelFromKey(state.lesson)}`;
+  const pages = buildPages(p);
+  const totalPages = pages.length;
+
+  const navHtml = `
+    <div class="page-nav">
+      <button id="prevPage">← Prev</button>
+      <span class="counter">Page <span id="curPage">1</span> of ${totalPages}</span>
+      <select id="jumpPage">
+        ${pages.map(pg => `<option value="${pg.num}">Page ${pg.num} — ${esc(pg.label)}</option>`).join('')}
+      </select>
+      <button id="nextPage">Next →</button>
+      <span class="reh-spacer"></span>
+      <span class="rehearsal-bar show">
+        <label for="rehearsalChar">🎭 Rehearsal</label>
+        <select id="rehearsalChar">
+          <option value="">All characters</option>
+          ${charNames.map(n => `<option value="${esc(n)}"${n===prevReh?' selected':''}>${esc(n)}</option>`).join('')}
+        </select>
+      </span>
+    </div>
+  `;
+
+  const renderCover = (pg) => `
+    <article class="page-paper" data-page="${pg.num}" data-kind="cover">
+      <div class="page-running">${esc(eyebrow)}</div>
+      <header class="cover">
+        <h1 class="play-title editable" contenteditable="true" data-bind="title">${esc(p.title)}</h1>
+        <div class="rule"></div>
+        <p class="logline editable" contenteditable="true" data-bind="logline">${esc(p.logline)}</p>
+        <div class="meta-row">
+          ~${p.estimatedRunTimeMin || '?'} min<span class="dot">·</span>
+          ${p.acts.length} act${p.acts.length>1?'s':''}<span class="dot">·</span>
+          ${p.characters.length} roles
+        </div>
+      </header>
+      <div class="page-num">— ${pg.num} —</div>
+    </article>`;
+
+  const renderFront = (pg) => `
+    <article class="page-paper" data-page="${pg.num}" data-kind="front">
+      <div class="page-running">${esc(p.title)}</div>
+      <div class="page-running right">Front Matter</div>
+
+      <section class="teacher-note">
+        <div class="label">Teacher's note — lesson</div>
+        <div class="editable" contenteditable="true" data-bind="lessonTakeaway">${esc(p.lessonTakeaway)}</div>
+      </section>
+
+      <h2 class="section-h">Cast of Characters</h2>
+      <div class="cast-grid">
+        ${p.characters.map((c, i) => {
+          const color = CHAR_COLORS[i % CHAR_COLORS.length];
+          const lc = counts[c.name] || 0;
+          return `
+            <div class="cast-card" style="--ch: ${color};">
+              <div class="avatar"></div>
+              <div class="info">
+                <span class="name editable" contenteditable="true" data-bind-char="${i}">${esc(c.name)}</span>
+                <span class="desc"> — <span class="editable" contenteditable="true" data-bind-char-desc="${i}">${esc(c.description)}</span></span>
+              </div>
+              <div class="lines-right">${lc} line${lc===1?'':'s'}</div>
+            </div>`;
+        }).join('')}
+      </div>
+
+      <h2 class="section-h">Setting</h2>
+      <div class="setting-block editable" contenteditable="true" data-bind="setting">${esc(p.setting)}</div>
+
+      <h2 class="section-h">Props</h2>
+      <ul class="prop-chips">
+        ${p.props.map((pr, i) => `<li><span class="editable" contenteditable="true" data-bind-prop="${i}">${esc(pr)}</span></li>`).join('')}
+      </ul>
+
+      <div class="page-num">— ${pg.num} —</div>
+    </article>`;
+
+  const renderLine = (item) => {
+    const { ai, si, li, line: ln } = item;
+    const upper = (ln.speaker || '').toUpperCase();
+    const isNarrator = upper === 'NARRATOR';
+    const isAll = upper === 'ALL';
+    const color = colorForSpeaker(ln.speaker, p);
+    const cls = ['line'];
+    if (isNarrator) cls.push('narrator');
+    if (isAll) cls.push('all');
+    const styleAttr = color ? ` style="--ch: ${color};"` : '';
+    const speakerOptions = allSpeakers.map(s => `<option ${s === ln.speaker ? 'selected' : ''}>${esc(s)}</option>`).join('');
+    return `
+      <div class="${cls.join(' ')}" data-speaker="${esc(ln.speaker)}"${styleAttr}>
+        <div class="speaker">
+          <select data-bind-speaker="${ai}-${si}-${li}">${speakerOptions}</select>
+        </div>
+        <div>
+          <div class="text editable" contenteditable="true" data-bind-text="${ai}-${si}-${li}">${esc(ln.text)}</div>
+          ${ln.direction ? `<span class="direction editable" contenteditable="true" data-bind-dir="${ai}-${si}-${li}">(${esc(ln.direction)})</span>` : ''}
+        </div>
+      </div>`;
+  };
+
+  const renderScript = (pg, isFirstOfAct) => {
+    const act = p.acts.find(a => a.number === pg.actNum);
+    let html = `<article class="page-paper" data-page="${pg.num}" data-kind="script">
+      <div class="page-running">${esc(p.title)}</div>
+      <div class="page-running right">${esc(pg.label)}</div>`;
+    if (isFirstOfAct) html += renderActHeaderHtml(act);
+    pg.items.forEach(item => {
+      if (item.kind === 'sceneStart') {
+        if (item.isFirstSceneOfAct && !isFirstOfAct) html += renderActHeaderHtml(act);
+        const sc = act.scenes[item.si];
+        let h = renderSceneHeaderHtml(sc, item.ai, item.si);
+        if (item.isContinuation) {
+          h = h.replace('<span>Scene ' + sc.number + '</span>', `<span>Scene ${sc.number} <em style="opacity:.6; font-style:italic; letter-spacing:0;">— continued</em></span>`);
+        }
+        // make editable bits actually editable in render (measurer doesn't need contenteditable)
+        h = h.replace(/data-bind-loc/g, 'contenteditable="true" data-bind-loc')
+             .replace(/data-bind-od/g, 'contenteditable="true" data-bind-od');
+        html += h;
+      } else if (item.kind === 'line') {
+        let h = renderLineHtmlForItem(item, p, allSpeakers);
+        h = h.replace(/data-bind-text/g, 'contenteditable="true" data-bind-text')
+             .replace(/data-bind-dir/g, 'contenteditable="true" data-bind-dir');
+        html += h;
+      }
+    });
+    if (pg.num === totalPages) html += `<div class="end-mark">— END —</div>`;
+    html += `<div class="page-num">— ${pg.num} —</div></article>`;
+    return html;
+  };
+
+  // Track first script page per act (to render the act header only once)
+  const seenActs = new Set();
+  const pagesHtml = pages.map(pg => {
+    if (pg.kind === 'cover') return renderCover(pg);
+    if (pg.kind === 'front') return renderFront(pg);
+    if (pg.kind === 'script') {
+      const first = !seenActs.has(pg.actNum);
+      seenActs.add(pg.actNum);
+      return renderScript(pg, first);
+    }
+    return '';
+  }).join('');
+
+  out.innerHTML = navHtml + `<div class="doc">${pagesHtml}</div>`;
+  attachEditHandlers();
+  // Post-render pass: split any page-paper that visually overflows
+  rebalanceOverflowingPages();
+  attachPageNav(document.querySelectorAll('.page-paper').length);
+  applyRehearsal();
+}
+
+// After render, walk each page and if its content exceeds the box, push trailing
+// elements to a new page-paper inserted right after.
+function rebalanceOverflowingPages() {
+  const doc = document.querySelector('#output .doc');
+  if (!doc) return;
+  let safety = 0;
+  let pages = Array.from(doc.querySelectorAll('.page-paper'));
+  for (let pi = 0; pi < pages.length && safety < 40; pi++, safety++) {
+    const page = pages[pi];
+    page.classList.add('is-active'); // make it measurable
+    if (page.scrollHeight <= page.clientHeight) { page.classList.remove('is-active'); continue; }
+
+    // Identify "movable" trailing children (lines, scene-blocks not at the start)
+    const movableSelector = '.line, .scene-block, .end-mark';
+    // Walk children from end, collecting until cumulative remaining height <= available
+    const innerH = page.clientHeight;
+    // Find the splitting child: walk forward summing heights of body children
+    const childArr = Array.from(page.children);
+    let runningTop = 0;
+    let splitFromIdx = -1;
+    for (let i = 0; i < childArr.length; i++) {
+      const c = childArr[i];
+      const top = c.offsetTop;
+      const bottom = top + c.offsetHeight;
+      if (bottom > innerH - 24) { splitFromIdx = i; break; }
+    }
+    if (splitFromIdx === -1) { page.classList.remove('is-active'); continue; }
+
+    // Don't split if splitting element is essential header (page-running, act-h, etc.) — keep it on page
+    const splitEl = childArr[splitFromIdx];
+    const tag = splitEl.tagName.toLowerCase();
+    const cls = splitEl.className || '';
+    if (cls.includes('page-running') || cls.includes('page-num')) {
+      page.classList.remove('is-active'); continue;
+    }
+
+    // Create new page after this one (clone outer attrs)
+    const newPage = document.createElement('article');
+    newPage.className = 'page-paper';
+    newPage.dataset.kind = page.dataset.kind || 'script';
+    // Copy running headers
+    const runningEls = page.querySelectorAll('.page-running');
+    runningEls.forEach(re => newPage.appendChild(re.cloneNode(true)));
+
+    // Move splitFrom + everything after (except trailing page-num) to new page
+    const toMove = [];
+    for (let i = splitFromIdx; i < childArr.length; i++) {
+      const c = childArr[i];
+      if (c.classList.contains('page-num') || c.classList.contains('page-running')) continue;
+      toMove.push(c);
+    }
+    toMove.forEach(c => newPage.appendChild(c));
+
+    // Add page-num placeholder (will be renumbered)
+    const num = document.createElement('div');
+    num.className = 'page-num'; num.textContent = '— ? —';
+    newPage.appendChild(num);
+
+    // Insert after current
+    page.parentNode.insertBefore(newPage, page.nextSibling);
+    page.classList.remove('is-active');
+    pages = Array.from(doc.querySelectorAll('.page-paper'));
+  }
+  // Renumber pages and page-num markers
+  pages = Array.from(doc.querySelectorAll('.page-paper'));
+  pages.forEach((p, i) => {
+    p.dataset.page = i + 1;
+    const num = p.querySelector('.page-num');
+    if (num) num.textContent = `— ${i + 1} —`;
+  });
+  // Rebuild jump dropdown
+  const sel = document.getElementById('jumpPage');
+  if (sel) {
+    const total = pages.length;
+    sel.innerHTML = pages.map((p, i) => {
+      const kind = p.dataset.kind;
+      const label = kind === 'cover' ? 'Title Page' : kind === 'front' ? 'Front Matter' : 'Script';
+      return `<option value="${i + 1}">Page ${i + 1} — ${label}</option>`;
+    }).join('');
+  }
+  // Update counter
+  const counter = document.querySelector('.page-nav .counter');
+  if (counter) counter.innerHTML = `Page <span id="curPage">1</span> of ${pages.length}`;
+}
+
+let _activePage = 1;
+let _totalPages = 1;
+function setActivePage(n) {
+  _activePage = Math.max(1, Math.min(_totalPages, n));
+  document.querySelectorAll('.page-paper').forEach(el => {
+    el.classList.toggle('is-active', +el.dataset.page === _activePage);
+  });
+  const cur = document.getElementById('curPage'); if (cur) cur.textContent = _activePage;
+  const sel = document.getElementById('jumpPage'); if (sel && sel.value !== String(_activePage)) sel.value = String(_activePage);
+  const prev = document.getElementById('prevPage'); if (prev) prev.disabled = _activePage <= 1;
+  const next = document.getElementById('nextPage'); if (next) next.disabled = _activePage >= _totalPages;
+  const fl = document.getElementById('flipLeft'); if (fl) fl.disabled = _activePage <= 1;
+  const fr = document.getElementById('flipRight'); if (fr) fr.disabled = _activePage >= _totalPages;
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function attachPageNav(total) {
+  _totalPages = total;
+  _activePage = 1;
+  const sel = document.getElementById('jumpPage');
+  document.getElementById('prevPage').addEventListener('click', () => setActivePage(_activePage - 1));
+  document.getElementById('nextPage').addEventListener('click', () => setActivePage(_activePage + 1));
+  sel.addEventListener('change', () => setActivePage(+sel.value));
+  // Floating flip arrows (only shown when a play exists)
+  const fl = document.getElementById('flipLeft');
+  const fr = document.getElementById('flipRight');
+  if (fl && fr) {
+    fl.classList.add('show'); fr.classList.add('show');
+    fl.onclick = () => setActivePage(_activePage - 1);
+    fr.onclick = () => setActivePage(_activePage + 1);
+  }
+  setActivePage(1);
+}
+// Keyboard navigation: ← / → or PageUp / PageDown
+if (!window._pageKeyBound) {
+  window._pageKeyBound = true;
+  document.addEventListener('keydown', e => {
+    if (!state.play) return;
+    // Don't hijack typing in inputs / contenteditable
+    const tag = (e.target && e.target.tagName) || '';
+    if (e.target && (e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(tag))) return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); setActivePage(_activePage + 1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); setActivePage(_activePage - 1); }
+  });
+}
+
+function applyRehearsal() {
+  const sel = document.getElementById('rehearsalChar');
+  const target = sel ? sel.value : '';
+  window._lastRehChar = target;
+  document.body.classList.toggle('rehearse-on', !!target);
+  document.querySelectorAll('.line').forEach(el => {
+    el.classList.toggle('spotlight', !!target && el.dataset.speaker === target);
+  });
+}
+// Wire up rehearsal select after each render via event delegation
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'rehearsalChar') applyRehearsal();
+});
+
+function attachEditHandlers() {
+  const out = document.getElementById('output');
+
+  out.querySelectorAll('[data-bind]').forEach(el => {
+    el.addEventListener('blur', () => {
+      const key = el.dataset.bind;
+      state.play[key] = el.textContent.trim();
+      if (key === 'title') document.getElementById('docTitle').textContent = state.play[key];
+    });
+  });
+
+  out.querySelectorAll('[data-bind-char]').forEach(el => {
+    el.addEventListener('blur', () => {
+      const i = +el.dataset.bindChar;
+      const oldName = state.play.characters[i].name;
+      const newName = el.textContent.trim();
+      if (oldName === newName || !newName) { el.textContent = oldName; return; }
+      state.play.characters[i].name = newName;
+      state.play.acts.forEach(a => a.scenes.forEach(s => s.lines.forEach(l => {
+        if (l.speaker === oldName) l.speaker = newName;
+      })));
+      renderPlay();
+    });
+  });
+  out.querySelectorAll('[data-bind-char-desc]').forEach(el => {
+    el.addEventListener('blur', () => {
+      const i = +el.dataset.bindCharDesc;
+      state.play.characters[i].description = el.textContent.trim();
+    });
+  });
+
+  out.querySelectorAll('[data-bind-prop]').forEach(el => {
+    el.addEventListener('blur', () => {
+      const i = +el.dataset.bindProp;
+      const oldP = state.play.props[i];
+      const newP = el.textContent.trim();
+      if (oldP === newP || !newP) { el.textContent = oldP; return; }
+      state.play.props[i] = newP;
+      const re = new RegExp('\\b' + oldP.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b', 'gi');
+      state.play.acts.forEach(a => a.scenes.forEach(s => s.lines.forEach(l => {
+        l.text = l.text.replace(re, newP);
+        if (l.direction) l.direction = l.direction.replace(re, newP);
+      })));
+      renderPlay();
+    });
+  });
+
+  out.querySelectorAll('[data-bind-loc]').forEach(el => {
+    el.addEventListener('blur', () => {
+      const [ai, si] = el.dataset.bindLoc.split('-').map(Number);
+      state.play.acts[ai].scenes[si].location = el.textContent.trim();
+    });
+  });
+  out.querySelectorAll('[data-bind-od]').forEach(el => {
+    el.addEventListener('blur', () => {
+      const [ai, si] = el.dataset.bindOd.split('-').map(Number);
+      state.play.acts[ai].scenes[si].openingDirection = el.textContent.trim().replace(/^\(|\)$/g,'');
+    });
+  });
+
+  out.querySelectorAll('[data-bind-text]').forEach(el => {
+    el.addEventListener('blur', () => {
+      const [ai, si, li] = el.dataset.bindText.split('-').map(Number);
+      state.play.acts[ai].scenes[si].lines[li].text = el.textContent.trim();
+    });
+  });
+  out.querySelectorAll('[data-bind-dir]').forEach(el => {
+    el.addEventListener('blur', () => {
+      const [ai, si, li] = el.dataset.bindDir.split('-').map(Number);
+      state.play.acts[ai].scenes[si].lines[li].direction = el.textContent.trim().replace(/^\(|\)$/g,'');
+    });
+  });
+  out.querySelectorAll('[data-bind-speaker]').forEach(el => {
+    el.addEventListener('change', () => {
+      const [ai, si, li] = el.dataset.bindSpeaker.split('-').map(Number);
+      state.play.acts[ai].scenes[si].lines[li].speaker = el.value;
+      renderPlay();
+    });
+  });
+
+  out.querySelectorAll('[data-rescene]').forEach(el => {
+    el.addEventListener('click', () => {
+      const [ai, si] = el.dataset.rescene.split('-').map(Number);
+      regenerateScene(ai, si);
+    });
+  });
+}
+
+/* ============================================================
+   EXPORT / LIBRARY
+   ============================================================ */
+function playToText(p = state.play) {
+  if (!p) return '';
+  let t = `${p.title}\n${'='.repeat(p.title.length)}\n\n`;
+  t += `${p.logline}\n\nLesson: ${p.lessonTakeaway}\n\nSetting: ${p.setting}\n\n`;
+  t += `Cast:\n${p.characters.map(c => `  ${c.name} — ${c.description}`).join('\n')}\n\n`;
+  t += `Props:\n${p.props.map(x => '  - '+x).join('\n')}\n\n`;
+  p.acts.forEach(a => {
+    t += `\n\nACT ${a.number}${a.title ? ' — ' + a.title : ''}\n${'-'.repeat(40)}\n`;
+    a.scenes.forEach(s => {
+      t += `\nScene ${s.number} — ${s.location}\n`;
+      if (s.openingDirection) t += `(${s.openingDirection})\n`;
+      s.lines.forEach(l => {
+        t += `\n${l.speaker.toUpperCase()}${l.direction ? ' (' + l.direction + ')' : ''}: ${l.text}`;
+      });
+      t += '\n';
+    });
+  });
+  return t;
+}
+
+async function copyText() {
+  if (!state.play) return;
+  try { await navigator.clipboard.writeText(playToText()); setStatus('Copied to clipboard.', 'success'); }
+  catch { setStatus('Copy failed', 'error'); }
+}
+function downloadText() {
+  if (!state.play) return;
+  const blob = new Blob([playToText()], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (state.play.title || 'play').replace(/[^a-z0-9]+/gi,'_') + '.txt';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function loadLibrary() { return JSON.parse(localStorage.getItem('cplay.lib') || '[]'); }
+function saveLibrary(arr) { localStorage.setItem('cplay.lib', JSON.stringify(arr)); }
+function saveToLibrary() {
+  if (!state.play) return;
+  const lib = loadLibrary();
+  lib.unshift({ id: Date.now(), savedAt: new Date().toISOString(), seed: state.seed, play: state.play });
+  saveLibrary(lib.slice(0, 50));
+  renderLibrary();
+  setStatus('Saved to library.', 'success');
+}
+function renderLibrary() {
+  const lib = loadLibrary();
+  const root = document.getElementById('library');
+  if (!lib.length) { root.innerHTML = ''; return; }
+  root.innerHTML = `<h2>Saved plays</h2>` + lib.map(item => `
+    <div class="lib-item" data-id="${item.id}">
+      <span><strong>${esc(item.play.title)}</strong> <span style="color:var(--muted)">· ${new Date(item.savedAt).toLocaleString()}${item.seed ? ' · seed ' + esc(String(item.seed)) : ''}</span></span>
+      <span>
+        <button data-load="${item.id}">Open</button>
+        <button data-del="${item.id}">Delete</button>
+      </span>
+    </div>`).join('');
+  root.querySelectorAll('[data-load]').forEach(b => b.addEventListener('click', () => {
+    const lib = loadLibrary();
+    const found = lib.find(x => x.id == b.dataset.load);
+    if (found) { state.play = found.play; renderPlay(); window.scrollTo({top:0,behavior:'smooth'}); }
+  }));
+  root.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+    saveLibrary(loadLibrary().filter(x => x.id != b.dataset.del));
+    renderLibrary();
+  }));
+}
+
+/* ============================================================
+   SURPRISE / NEW
+   ============================================================ */
+function surpriseMe() {
+  const lessons = Object.keys(LESSONS);
+  const tones = ['silly','heartfelt','adventurous','mysterious','fairytale'];
+  const conflicts = ['vs-self','vs-other','vs-nature','vs-group'];
+  const settings = Object.keys(SETTINGS);
+
+  state.lesson = pickAny(lessons);
+  state.tone = pickAny(tones);
+  state.conflict = pickAny(conflicts);
+  state.setting = pickAny(settings);
+  state.random = chanceAny(0.5) ? 'spicy' : 'none';
+  state.characters = []; state.props = [];
+  state.seed = String(Math.floor(Math.random() * 1e9));
+
+  document.querySelectorAll('[data-chips="tone"] .chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.val === state.tone ? 'true':'false'));
+  document.querySelectorAll('[data-chips="conflict"] .chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.val === state.conflict ? 'true':'false'));
+  document.querySelectorAll('[data-chips="random"] .chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.val === state.random ? 'true':'false'));
+  document.getElementById('lesson').value = state.lesson;
+  document.getElementById('setting').value = state.setting;
+  document.getElementById('seed').value = state.seed;
+  renderCharacterList(); renderPropList();
+  generate();
+}
+// Math.random-based helpers (used outside the seeded RNG, e.g. picking new seed)
+function pickAny(a) { return a[Math.floor(Math.random() * a.length)]; }
+function chanceAny(p) { return Math.random() < p; }
+
+function newPlay() {
+  state.play = null;
+  document.body.classList.remove('has-play');
+  document.getElementById('docTitle').textContent = 'No play yet';
+  document.getElementById('output').innerHTML = `<div class="empty"><h2>Pick your pieces, press Generate.</h2></div>`;
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+wireChips();
+wireForm();
+renderCharacterList();
+renderPropList();
+renderLibrary();
+</script>
+</body>
+</html>
