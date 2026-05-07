@@ -1762,6 +1762,49 @@ const TWISTS = [
   "(weather turns) The wind shifts, and with it, the day.",
   "(echo) The {settingFeature1} answers back — once, just clearly enough to be heard.",
   "(thing that wasn't lost) The {prop1} was never missing — it was right where someone left it on purpose.",
+  "(double meaning) Someone realizes the words they said earlier meant something different than they intended.",
+  "(silent witness) An older character has been quietly watching, and steps forward now — just briefly.",
+  "(coincidence) A second {prop1} appears, exactly when one was needed.",
+  "(mistake everyone shared) Each character realizes they were ALL doing the same thing wrong.",
+  "(letter from the future) Someone finds a note in their own handwriting — but they don't remember writing it.",
+];
+
+// Ambient stage moments — soft atmospheric beats injected between major beats
+const AMBIENT_MOMENTS = [
+  "(A breeze moves through {settingFeature1}, slow and soft.)",
+  "(Somewhere off, a bird calls. No one answers.)",
+  "(A long beat. The {settingShort} holds its breath.)",
+  "(Light shifts. Just slightly. As if someone passed a hand over the sun.)",
+  "(Off, faint: the sound of someone humming.)",
+  "(A leaf falls between them, slow as a feather.)",
+  "(A bell, somewhere far. Then quiet.)",
+  "(NARRATOR lets the moment hang.)",
+  "(Wind in {settingFeature1}. The kind that means something is about to change.)",
+  "(A creak from the old boards of {settingShort}.)",
+];
+
+// Opening flourishes — alternate hooks that occasionally replace the standard opener
+const OPENING_FLOURISHES = [
+  null, null, null, // weight standard opener (null) higher — most plays use it
+  [
+    {s:"N", t:"Picture, if you will, {settingShort}. Picture {hero}, on a day they did not see coming."},
+  ],
+  [
+    {s:"N", t:"This is a story. It happens fast. So pay attention."},
+    {s:"N", t:"It begins in {settingShort}, with {hero}, who has no idea yet."},
+  ],
+  [
+    {s:"N", t:"Something was different about {settingShort} that morning. Nobody could have said what."},
+  ],
+  [
+    {s:"N", t:"Once — not long ago, but long enough — there was a place called {settingShort}."},
+    {s:"N", t:"And in that place, {hero} was about to have a very interesting day."},
+  ],
+  [
+    {s:"hero", t:"({exclaim}) Wait. Wait wait wait. Stop. I have to back up.", d:"breaking the fourth wall, briefly"},
+    {s:"N", t:"({hero} catches themselves.)"},
+    {s:"hero", t:"... never mind. Start over. Pretend I wasn't here yet."},
+  ],
 ];
 
 // Conflict-aware insertion — extra rising-action lines based on conflict type
@@ -1788,25 +1831,44 @@ const CONFLICT_BEATS = {
    ENGINE
    ============================================================ */
 
-// Resolve {key} from a context object. Supports things like {hero}, {prop1}, {settingFeature1}, {greeting}.
+// Resolve {key} from a context object. Iterates so a variant pool (e.g. "{exclaim}")
+// that returns a string containing more {tokens} also gets filled.
 function fill(template, ctx) {
   if (!template) return "";
-  return template.replace(/\{([a-zA-Z0-9_.]+)\}/g, (_, key) => {
-    // dotted access: hero.species etc — we keep flat for now
-    if (ctx.chars[key]) return ctx.chars[key].name;
-    if (ctx.props[key] !== undefined) return ctx.props[key];
-    if (key === "settingShort") return ctx.setting.short;
-    if (key === "settingFull") return ctx.setting.full;
-    if (key.startsWith("settingFeature")) {
-      const idx = parseInt(key.replace("settingFeature","")) || 1;
-      return ctx.setting.features[(idx - 1) % ctx.setting.features.length];
-    }
-    // tone-overridden variant pools
-    const toneV = TONES[ctx.state.tone] || {};
-    const pool = toneV[key] || V[key];
-    if (pool && Array.isArray(pool)) return pick(pool);
-    return "{" + key + "}";
-  });
+  // Fallback chains for character roles that may not exist on small casts
+  const charChains = {
+    helper:   ['helper','friend','foil','hero'],
+    mentor:   ['mentor','friend','foil','hero'],
+    friend:   ['friend','foil','helper','mentor','hero'],
+    newcomer: ['newcomer','foil','friend','helper','hero'],
+    foil:     ['foil','friend','helper','mentor','hero'],
+    hero:     ['hero','foil','friend','mentor','helper'],
+  };
+  let out = template, prev;
+  for (let pass = 0; pass < 6; pass++) {
+    prev = out;
+    out = out.replace(/\{([a-zA-Z0-9_.]+)\}/g, (m, key) => {
+      // Character roles (with fallback through chain)
+      if (charChains[key]) {
+        for (const alt of charChains[key]) if (ctx.chars[alt]) return ctx.chars[alt].name;
+      } else if (ctx.chars[key]) {
+        return ctx.chars[key].name;
+      }
+      if (ctx.props[key] !== undefined) return ctx.props[key];
+      if (key === "settingShort") return ctx.setting.short;
+      if (key === "settingFull") return ctx.setting.full;
+      if (key.startsWith("settingFeature")) {
+        const idx = parseInt(key.replace("settingFeature","")) || 1;
+        return ctx.setting.features[(idx - 1) % ctx.setting.features.length];
+      }
+      const toneV = TONES[ctx.state.tone] || {};
+      const pool = toneV[key] || V[key];
+      if (pool && Array.isArray(pool)) return pick(pool);
+      return m; // leave unresolved literal in place; loop will exit
+    });
+    if (out === prev) break;
+  }
+  return out;
 }
 
 // Resolve speaker code (hero/foil/...) to actual character name
@@ -1977,12 +2039,29 @@ function buildArc(ctx) {
   const shape = ctx.shape;
   const lesson = LESSONS[ctx.state.lesson];
   let lines = [];
-  lines = lines.concat(expandBeat(shape.setup, ctx));
+  // Optionally replace the first narrator line of setup with a flourish hook
+  const flourish = pick(OPENING_FLOURISHES);
+  if (flourish) {
+    lines = lines.concat(expandBeat(flourish, ctx));
+    // Skip the original setup's first narrator line (which is a similar opener)
+    const setupRest = shape.setup.filter((b, i) => !(i === 0 && (b.s === 'N' || b.s === 'NARRATOR')));
+    lines = lines.concat(expandBeat(setupRest, ctx));
+  } else {
+    lines = lines.concat(expandBeat(shape.setup, ctx));
+  }
   lines = lines.concat(expandBeat(shape.inciting, ctx));
+  // Ambient atmosphere moment between inciting and rising (only if narrator is on)
+  if (ctx.state.narrator !== 'off' && ctx.state.length !== 'short' && chance(0.5)) {
+    lines.push({ speaker: 'NARRATOR', text: fill(pick(AMBIENT_MOMENTS), ctx) });
+  }
   lines = lines.concat(expandBeat(shape.rising, ctx));
   // Conflict-aware injection — adds 1-3 lines tinted to the conflict type
   const cb = CONFLICT_BEATS[ctx.state.conflict];
   if (cb) lines = lines.concat(expandBeat(cb, ctx));
+  // A second ambient moment right before the climax
+  if (ctx.state.narrator !== 'off' && chance(0.4)) {
+    lines.push({ speaker: 'NARRATOR', text: fill(pick(AMBIENT_MOMENTS), ctx) });
+  }
   // Optional song just before climax
   if (ctx.state.songs) {
     const verses = pick(SONGS);
