@@ -310,10 +310,14 @@
     display: flex; gap: 14px;
   }
   button.primary, button.secondary {
-    flex: 1; padding: 18px 20px; border-radius: 12px; cursor: pointer; font-weight: 700;
-    border: 1px solid var(--accent); font-size: 14px; font-family: var(--sans);
-    letter-spacing: 1.4px; text-transform: uppercase;
+    flex: 1; padding: 12px 16px; border-radius: 10px; cursor: pointer; font-weight: 700;
+    border: 1px solid var(--accent); font-size: 12px; font-family: var(--sans);
+    letter-spacing: 1.2px; text-transform: uppercase;
     transition: background .12s, transform .12s;
+  }
+  /* Mobile keeps roomier buttons for fingertip-comfortable taps */
+  @media (max-width: 600px) {
+    button.primary, button.secondary { padding: 16px 18px; font-size: 14px; border-radius: 12px; }
   }
   button.primary { background: var(--accent); color: #fff; }
   button.primary:hover { background: var(--ink); border-color: var(--ink); }
@@ -896,8 +900,6 @@
         </div>
       </div>
     </details>
-  </div>
-
     </div><!-- /.setup-card -->
 
     <div class="setup-actions">
